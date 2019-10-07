@@ -54,6 +54,8 @@ Long-running operations are still offloaded into separate threads.
 
 ## Experimental Design
 
+### High-level requirements
+
 We want each experimental implementation to meet the following requirements:
 
 1. Must contain multiple stateful components whose states mutate in complex ways
@@ -65,6 +67,17 @@ We want each experimental implementation to meet the following requirements:
    entities).
 4. Must demonstrate handling of prioritized events, such that high-priority
    events are not blocked by lower-priority events.
+
+### Options in terms of implementation
+We need to implement something relatively meaningful for this project to make
+sense to the team. Options include:
+
+* A highly concurrent implementation of the **Alien Invasion** puzzle (difficult
+  to structure as a concurrent application, but an easy bridge between what the
+  team knows and what they need to learn)
+* A stripped-down, simulated version of a full Tendermint node (probably the
+  most meaningful option, but most likely the most difficult and time-consuming
+  to implement)
 
 ## Experimental Evaluation
 
