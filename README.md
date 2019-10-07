@@ -78,6 +78,7 @@ sense to the team. Options include:
 * A stripped-down, simulated version of a full Tendermint node (probably the
   most meaningful option, but most likely the most difficult and time-consuming
   to implement)
+* An implementation of the push/pop server we built during the Rust training
 
 ## Experimental Evaluation
 
