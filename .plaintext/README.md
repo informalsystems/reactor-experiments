@@ -23,9 +23,9 @@ This is a "half-way point" milestone to gauge what's working in the project and
 what's not.
 
 #### Deliverables
-1. Selection of multiple concurrency model options (at least 2)
-2. Lightweight implementations of at least 2 concurrency models
-3. Small demo of work done so far
+1. Selection of at least 2 concurrency model options (`options`)
+2. Lightweight implementations of at least 2 concurrency models (`2-impl`)
+3. Small demo of work done so far (`check-in-demo`)
 
 ### 3-month completion (`3-month-completion`, due 20 December 2019)
 This is the final milestone for this investigation to showcase the final
@@ -33,8 +33,9 @@ decision and way forward for the optimal concurrency model for Tendermint in
 Rust.
 
 #### Deliverables
-1. Architecture decision record (ADR) for selected concurrency model
+1. Architecture decision record (ADR) for selected concurrency model (`adr`)
 2. Presentation showcasing the final design and reasoning for the design
+   (`final-demo`)
 
 ## Solution Design
 For more details on the solution design for this project, please see the
