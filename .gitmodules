@@ -1,3 +1,0 @@
-[submodule "single-threaded-core/asyncawait"]
-	path = single-threaded-core/asyncawait
-	url = git@github.com:interchainio/rx-stc-asyncawait.git
