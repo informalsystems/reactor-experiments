@@ -7,6 +7,10 @@ best for us.
 This repository will eventually contain several proof-of-concept Rust programs
 that will demonstrate different concurrency architectures/approaches.
 
+See the [plaintext project](./.plaintext/README.md) for more details as to the
+structure of the project, including milestones, deliverables and the breakdown
+thereof.
+
 ## Approaches
 At present, the approaches under consideration include the following.
 
@@ -79,6 +83,10 @@ sense to the team. Options include:
   most meaningful option, but most likely the most difficult and time-consuming
   to implement)
 * An implementation of the push/pop server we built during the Rust training
+
+The best option here is likely **a stripped-down, simulated version of a
+Tendermint full node**. It would probably provide the best possible starting
+point for conversations.
 
 ## Experimental Evaluation
 
