@@ -26,14 +26,18 @@ conceptual isolation from the remainder of the node's functionality.
 
 Within this model, there are several possibilities for implementation:
 
-1. Async/await - we could make use of Rust's new
-   [async/await](https://rust-lang.github.io/async-book/) functionality to
-   implement this model.
-2. [Tokio](https://tokio.rs/)-based concurrency, which provides higher-level
+1. [Tokio](https://tokio.rs/)-based concurrency, which provides higher-level
    abstraction to handle concurrency.
-3. [Crossbeam](https://github.com/crossbeam-rs/crossbeam)-based concurrency,
+2. [Crossbeam](https://github.com/crossbeam-rs/crossbeam)-based concurrency,
    which provides much lower-level primitives than Tokio for managing
    concurrency.
+
+We will not, at this time, be implementing any `async`/`await`-based solutions
+since, at the time of starting this project, the async/await syntax has not yet
+been released as stable (should be released in Rust 1.39). See [this
+issue](https://github.com/rust-lang/rust/pull/63209) and related issues to track
+progress on this. Perhaps we can revisit this at a future date once the API is
+fully stabilized.
 
 ### 2. Event-driven single-thread-per-reactor model with offloading
 
@@ -43,18 +47,18 @@ other by way of message passing.
 
 Long-running operations are still offloaded into separate threads.
 
-1. Async/await - we could make use of Rust's new
-   [async/await](https://rust-lang.github.io/async-book/) functionality to
-   implement this model.
-2. [Tokio](https://tokio.rs/)-based concurrency, which provides higher-level
+1. [Tokio](https://tokio.rs/)-based concurrency, which provides higher-level
    abstraction to handle concurrency.
-3. [Crossbeam](https://github.com/crossbeam-rs/crossbeam)-based concurrency,
+2. [Crossbeam](https://github.com/crossbeam-rs/crossbeam)-based concurrency,
    which provides much lower-level primitives than Tokio for managing
    concurrency.
-4. [Actix](https://actix.rs/)-based concurrency, which provides very high-level
+3. [Actix](https://actix.rs/)-based concurrency, which provides very high-level
    patterns for building out distributed systems. Use of Actix facilitates
    inter-reactor communication using higher-level patterns than other
    approaches.
+
+Similarly to the reasoning above, we will not be implementing any
+async/await-based options.
 
 ## Experimental Design
 
