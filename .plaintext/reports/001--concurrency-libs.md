@@ -56,19 +56,17 @@ The best possible approach to dealing with I/O is the one that allows for:
 
 ### Non-blocking I/O in general
 In terms of **scalability**, it generally seems that **non-blocking I/O**
-provides the best possible performance. The naive approach of wanting to loop
-through many open sockets [simply does not
-work](http://www.wangafu.net/~nickm/libevent-book/01_intro.html), and even if it
-did work one's CPU usage would be through the roof. The best approach to
-implementing non-blocking I/O seems to be OS-specific, where each OS provides
-some kind of mechanism to subscribe to certain kinds of I/O-related events, and
-then wait (without burning up the CPU) until such events come through.
+provides the best possible performance. Looking at how non-blocking I/O is
+implemented in many popular systems, the best approach to doing so seems to be
+OS-specific. Each OS seems to provide some kind of mechanism to subscribe to
+certain kinds of I/O-related events, and then wait (without burning up the CPU)
+until such events come through.
 
-In terms of libraries and general approaches,
-[libevent](https://github.com/libevent/libevent) (C library) seems to be one of
-the most mature and popular libraries, and its primary purpose is to abstract
-OS-level interfaces that effectively allow for non-blocking I/O. These
-lower-level interfaces include:
+To showcase a concrete example of what seems to be the most popular approach to
+non-blocking I/O, take a look at
+[libevent](https://github.com/libevent/libevent) (C library). Its primary
+purpose is to abstract OS-level interfaces that effectively allow for
+non-blocking I/O. These lower-level interfaces include:
 
 * [epoll](http://man7.org/linux/man-pages/man7/epoll.7.html) on Linux
 * [kqueue](https://man.openbsd.org/kqueue.2) on BSD and
@@ -80,14 +78,17 @@ lower-level interfaces include:
 * others (see the [libevent home page](https://libevent.org/) for
   details)
 
-The high-performance web server [Nginx builds its own abstraction layer on top
-of these different
-APIs](https://github.com/nginx/nginx/tree/master/src/event/modules). [NodeJS
-uses libuv under the hood](https://github.com/nodejs/node/tree/master/deps/uv),
-which also wraps all of these interfaces.
+Other examples of popular systems making use of this approach:
+
+* The high-performance web server [Nginx builds its own abstraction layer on top
+  of these different
+  APIs](https://github.com/nginx/nginx/tree/master/src/event/modules).
+* [NodeJS uses libuv under the
+  hood](https://github.com/nodejs/node/tree/master/deps/uv), which also wraps
+  all of these OS-specific interfaces.
 
 ### Non-blocking I/O in Rust
-In the Rust world, Mio [wraps these underlying
+In the Rust world, [Mio also wraps these underlying
 APIs](https://github.com/tokio-rs/mio/tree/master/src/sys). Tokio uses Mio under
 the hood, and Actix uses Tokio under the hood, so we can consider all both Tokio
 and Actix to just be higher and higher levels of abstraction built on top of
