@@ -44,8 +44,8 @@ Rust, we need it to be a solid one.
 ### Dealing with I/O
 We are most interested in the best possible approach to dealing with I/O, and
 when we say I/O we mean specifically socket and filesystem access. I/O is not
-only the most critical source of input and output for Tendermint, it's also the
-primary source of non-determinism in the system.
+only the most critical source of data for Tendermint's correct operation, it's
+also the primary source of non-determinism in the system.
 
 The best possible approach to dealing with I/O is the one that allows for:
 
