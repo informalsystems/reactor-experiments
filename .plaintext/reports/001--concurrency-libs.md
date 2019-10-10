@@ -87,6 +87,10 @@ Other examples of popular systems making use of this approach:
   hood](https://github.com/nodejs/node/tree/master/deps/uv), which also wraps
   all of these OS-specific interfaces.
 
+For further, more detailed information on non-blocking I/O in general, see [this
+chapter from the libevent
+documentation](http://www.wangafu.net/~nickm/libevent-book/01_intro.html).
+
 ### Non-blocking I/O in Rust
 In the Rust world, [Mio also wraps these underlying
 APIs](https://github.com/tokio-rs/mio/tree/master/src/sys). Tokio uses Mio under
