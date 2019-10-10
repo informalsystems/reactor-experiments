@@ -1,5 +1,7 @@
 # Research regarding potential concurrency library options
 
+| Property    | Value                 |
+| ----------- | --------------------- |
 | Owner       | <thane@interchain.io> |
 | Due         | 18 November 2019      |
 | Uncertainty | High                  |
