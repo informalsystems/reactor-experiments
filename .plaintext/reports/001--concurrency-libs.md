@@ -27,7 +27,7 @@ our purposes?
 In line with the [project goals](../README.md), we need to assess these
 different libraries in terms of:
 
-* amenability to deterministic,
+* amenability to deterministic simulation,
 * developer ergonomics, and
 * observability.
 
