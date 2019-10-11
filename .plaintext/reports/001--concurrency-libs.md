@@ -3,9 +3,9 @@
 ## Executive Summary
 Different approaches to concurrency (especially as they relate to Rust
 development) are discussed here, along with the architectural implications of
-choosing blocking (multi-threaded) versus non-blocking I/O approaches.
-It appears as though there is only really one major library that facilitates
-cross-platform non-blocking I/O in Rust
+choosing blocking (multi-threaded) versus non-blocking I/O approaches.  It
+appears as though there is only really one major library that facilitates
+cross-platform non-blocking (also multi-threaded) I/O in Rust
 ([Mio](https://github.com/tokio-rs/mio/), on which Tokio is built). It is
 recommended, for the sake of time and to consider all options as broadly as
 possible, that we attempt to build 4 experiments to showcase (1) the impact of
@@ -17,6 +17,7 @@ for each of the possible node architectures.
 * [00001](../tasks/00001--research-potential-options.md)
 
 ## Overview
+
 In order to implement an appropriate concurrency model in Rust, we need to
 evaluate the different libraries/frameworks available to us for this purpose.
 At the time of creating this task, the following options were known and
