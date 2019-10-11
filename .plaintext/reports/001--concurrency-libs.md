@@ -223,5 +223,8 @@ application:
 Options 1 and 2 above will allow us to showcase the differences between two
 high-level architectural approaches to building a Tendermint node, and we will
 be able to see the effects of both blocking and non-blocking I/O architectures
-for each of those high-level architectures.
+for each of those high-level architectures. This will also start giving us a
+practical sense of what it would take to migrate from a blocking to a
+non-blocking I/O-based architecture in future, should we choose to go down that
+route.
 
