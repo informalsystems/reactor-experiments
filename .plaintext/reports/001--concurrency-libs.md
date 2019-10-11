@@ -11,7 +11,9 @@ recommended, for the sake of time and to consider all options as broadly as
 possible, that we attempt to build 4 experiments to showcase (1) the impact of
 having a single global event loop for a Tendermint node versus each reactor
 having its own event loop, and (2) both blocking and non-blocking I/O approaches
-for each of the possible node architectures.
+for each of the possible node architectures. Business logic will be common to
+all 4 experiments, but I/O and event handling will differ between the
+experiments.
 
 ## Related Tasks
 * [00001](../tasks/00001--research-potential-options.md)
