@@ -207,6 +207,7 @@ architecture that lends itself to deterministic simulation.
 
 ## Recommendations
 
+### Architecture
 After reviewing some popular approaches to dealing with concurrency in general,
 and specifically using Rust, it would appear as though the best approach in the
 **Reactor Experiments** project would be to build the following versions of an
@@ -227,4 +228,22 @@ for each of those high-level architectures. This will also start giving us a
 practical sense of what it would take to migrate from a blocking to a
 non-blocking I/O-based architecture in future, should we choose to go down that
 route.
+
+### Libraries recommended for experimentation
+
+Common libraries to assist in multi-threading:
+
+* [Crossbeam](https://github.com/crossbeam-rs/crossbeam)
+* Either [rust-threadpool](https://github.com/rust-threadpool/rust-threadpool)
+  or our own custom thread pool management solution (if building such a solution
+  is simple enough)
+
+Blocking I/O:
+
+* Use Rust's standard libraries for I/O with whichever thread pool
+  implementation we decide on
+
+Non-blocking I/O:
+
+* [Tokio](https://tokio.rs/), but the pre-async/await version of Tokio
 
