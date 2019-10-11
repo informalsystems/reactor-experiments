@@ -151,6 +151,14 @@ data structures, the following libraries should be considered:
 4. [rust-threadpool](https://github.com/rust-threadpool/rust-threadpool) - A
    simple thread pool implementation.
 
+### Observability
+Apart from simple instrumentation like that provided by [Prometheus
+integration](https://github.com/pingcap/rust-prometheus), we need ways to trace
+events as they make their way through the system. There is one library provided
+by the Tokio team called [tracing](https://github.com/tokio-rs/tracing) that
+provides this kind of functionality, but does not require that one use Tokio at
+all.
+
 ## Architectural Implications
 
 The following sections deal with the implications of choosing the blocking
