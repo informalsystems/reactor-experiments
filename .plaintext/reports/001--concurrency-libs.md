@@ -159,6 +159,9 @@ data structures, the following libraries should be considered:
 4. [rust-threadpool](https://github.com/rust-threadpool/rust-threadpool) - A
    simple thread pool implementation.
 
+We could make use of these libraries by themselves or in combination with each
+other, as we see fit.
+
 ### Observability
 Apart from simple instrumentation like that provided by [Prometheus
 integration](https://github.com/pingcap/rust-prometheus), we need ways to trace
