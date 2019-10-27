@@ -182,7 +182,7 @@ chief concerns here are:
 
 1. strict adherence to a message passing architecture (as per Go's philosophy of
    "share state by communicating, instead of communicating by sharing state"),
-2. where thread pools are necessary, and
+2. where, exactly, to make use of thread pools and where not, and
 3. the intelligent management of thread pools.
 
 ### Implications of non-blocking I/O
