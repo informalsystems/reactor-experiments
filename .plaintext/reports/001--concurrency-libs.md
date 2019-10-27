@@ -140,8 +140,9 @@ hood while still using Tokio's underlying event loop.
 ### Concurrency in Rust
 While I/O is one of the biggest influences in terms of concurrency architecture,
 we know that the Rust-based implementation of Tendermint will most likely need
-to deal with threads and possibly thread pool management. In Go, this was not a
-real concern since Go's channels effectively abstracted these concerns away.
+to deal with threads and possibly thread pool management. (In Go, this was not
+as much of a concern because the application runtime provides this kind of
+thread pool management for goroutines.)
 
 When it comes to managing threads and/or thread pools, as well as concurrent
 data structures, the following libraries should be considered:
