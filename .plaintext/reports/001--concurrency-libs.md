@@ -80,6 +80,11 @@ What is meant by "relatively small"? This seems to be system resource-dependent.
 It could imply a few thousand simultaneous I/O operations on some systems, but
 on more constrained hardware it might mean only a few hundred, or even fewer.
 
+Right now, there are [minimum hardware
+requirements](https://tendermint.com/docs/tendermint-core/running-in-production.html#hardware)
+for running Tendermint in production, and we should keep these in mind when
+performing experiments and benchmarks of these experiments.
+
 ### Non-blocking I/O
 In terms of **scalability**, it generally seems that **non-blocking I/O**
 provides the best possible performance. Looking at how non-blocking I/O is
