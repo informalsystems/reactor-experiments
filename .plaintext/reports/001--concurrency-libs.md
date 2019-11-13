@@ -235,11 +235,11 @@ and specifically using Rust, it would appear as though the best approach in the
 application:
 
 1. Single-threaded core event loop, implemented using
-   1. blocking I/O, and
+   1. blocking I/O with thread pools, and
    2. non-blocking I/O.
 2. One thread per reactor (and one thread for the Tendermint node), implemented
    using:
-   1. blocking I/O, and
+   1. blocking I/O with thread pools, and
    2. non-blocking I/O.
 
 Options 1 and 2 above will allow us to showcase the differences between two
