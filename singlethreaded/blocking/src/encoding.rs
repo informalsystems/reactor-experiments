@@ -257,7 +257,7 @@ pub trait PeerMessageWriter: AnyWriter {
 /// Trait that facilitates writing [`Any`][1] messages.
 pub trait AnyWriter: Write {
     fn write_any(&mut self, msg: Any) -> std::io::Result<()> {
-        let mut buf = BytesMut::new();
+        let mut buf = BytesMut::with_capacity(MAX_MESSAGE_LEN);
         // serialize the message
         msg.encode(&mut buf)?;
         let msg_len = buf.len();
