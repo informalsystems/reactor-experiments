@@ -109,7 +109,7 @@ pub mod protos {
 }
 
 /// We limit message sizes to 1kB at present.
-pub const MAX_MESSAGE_LEN: usize = 1 * 1024;
+pub const MAX_MESSAGE_LEN: usize = 1024;
 
 /// The number of bytes in the length delimiter. Must be enough to accommodate
 /// `MAX_MESSAGE_LEN`.
