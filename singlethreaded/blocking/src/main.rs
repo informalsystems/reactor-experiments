@@ -38,7 +38,10 @@ fn main() -> std::io::Result<()> {
         Level::Info
     })
     .unwrap();
-    info!("Binding node to {}:{}", &config.bind_host, &config.bind_port);
+    info!(
+        "Binding node to {}:{}",
+        &config.bind_host, &config.bind_port
+    );
     let mut node = seed_node::SeedNode::new(config);
     node.run()
 }

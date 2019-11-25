@@ -139,4 +139,3 @@ fn remote_peer_receive_loop(
         }
     }
 }
-
