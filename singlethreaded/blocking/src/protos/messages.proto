@@ -1,9 +1,15 @@
 syntax = "proto3";
 
-package protos.p2p;
+package protos.messages;
+
+// The first message a peer sends when connecting to another peer. It sends its
+// own ID.
+message PeerHello {
+    string id = 1; // A hex-encoded cryptographic address for this peer.
+}
 
 // The address of a peer in the network.
-message Addr {
+message PeerAddr {
     string id = 1; // A hex-encoded cryptographic address for this peer.
     string ip = 2; // The IPv4 or IPv6 address for this peer.
     uint32 port = 3; // The port on which to reach this peer (any number 65536 or greater will be regarded as a malformed message)
@@ -11,9 +17,9 @@ message Addr {
 
 // An address book is just a list of `PeerAddr` instances.
 message AddressBook {
-    repeated Addr addrs = 1;
+    repeated PeerAddr addrs = 1;
 }
 
 // A simple request for a peer's address book.
-message RequestAddressBook {}
+message AddressBookRequest {}
 
