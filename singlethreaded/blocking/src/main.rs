@@ -1,4 +1,3 @@
-mod crypto;
 mod encoding;
 mod events;
 mod messages;
