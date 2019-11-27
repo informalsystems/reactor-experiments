@@ -325,8 +325,15 @@ mod tests {
         for _ in 0..2 {
             channel::select! {
                 recv(notify_rx1) -> r => match r {
-                    Ok(peer_addr) => {
-                        info!("Got notification of peer added to address book: {:?}", peer_addr);
+                    Ok(ev) => {
+                        info!("Got event: {:?}", ev);
+                        match ev {
+                            Event::Peer(pe) => match pe {
+                                PeerEvent::AddedToAddressBook(_) => {},
+                                _ => panic!("Expected PeerEvent::AddedToAddressBook event"),
+                            }
+                            _ => panic!("Expected Event::Peer event"),
+                        }
                         received += 1;
                     },
                     Err(e) => {
