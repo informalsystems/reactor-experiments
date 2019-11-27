@@ -213,6 +213,11 @@ pub trait PeerMessageReader: AnyReader {
             >::from(
                 protos::AddressBook::from_protobuf_any(msg_encoded)?,
             )?)),
+            protos::TYPEURL_PEERHELLO => Ok(PeerMessage::Hello(
+                std::io::Result::<types::PeerHello>::from(protos::PeerHello::from_protobuf_any(
+                    msg_encoded,
+                )?)?,
+            )),
             _ => Err(MessageReaderError::UnrecognizedType(msg_encoded.type_url).into()),
         }
     }

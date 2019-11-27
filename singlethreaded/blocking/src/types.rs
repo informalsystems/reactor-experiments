@@ -4,6 +4,7 @@
 //!
 
 use std::net::IpAddr;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A node/peer ID is a hex-encoded cryptographic address.
 pub type ID = String;
@@ -34,5 +35,26 @@ pub struct AddressBook {
 impl AddressBook {
     pub fn new() -> Self {
         AddressBook { addrs: Vec::new() }
+    }
+}
+
+/// We define a subscription ID as a monotonically increasing unsigned integer
+/// here.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct SubscriptionID(u64);
+
+// We use a global atomic subscription counter here. With 64-bit values, we
+// shouldn't run out during the lifetime of our node.
+static SUBSCRIPTION_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+impl Default for SubscriptionID {
+    fn default() -> SubscriptionID {
+        SubscriptionID(SUBSCRIPTION_COUNTER.fetch_add(1, Ordering::SeqCst))
+    }
+}
+
+impl SubscriptionID {
+    pub fn new() -> SubscriptionID {
+        SubscriptionID::default()
     }
 }
