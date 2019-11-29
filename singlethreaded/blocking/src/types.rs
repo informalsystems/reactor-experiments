@@ -27,7 +27,7 @@ pub struct PeerAddr {
 }
 
 /// An address book containing the addresses of zero or more peers.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct AddressBook {
     pub addrs: Vec<PeerAddr>,
 }
