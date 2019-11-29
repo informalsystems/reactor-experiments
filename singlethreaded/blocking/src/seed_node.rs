@@ -177,10 +177,6 @@ impl SeedNode {
     }
 
     fn read_peer_hello(&mut self, stream: &mut TcpStream) -> std::io::Result<()> {
-        // WTF? Rust claims further on in this method that the stream cannot be
-        // borrowed as mutable, but it's literally declared as a mutable
-        // reference in the function parameters.
-        let mut stream = stream;
         // TODO: Implement this as a state machine in a non-blocking fashion
         // we expect the peer to introduce themselves here
         let msg = match stream.read_peer_message() {
@@ -191,14 +187,13 @@ impl SeedNode {
             }
         };
         match msg {
-            PeerMessage::Hello(hello) => self.try_add_peer(&mut stream, hello)?,
+            PeerMessage::Hello(hello) => self.try_add_peer(stream, hello)?,
             _ => error!("Incoming peer did not introduce themselves. Dropping connection."),
         }
         Ok(())
     }
 
     fn try_add_peer(&mut self, stream: &mut TcpStream, hello: PeerHello) -> std::io::Result<()> {
-        let mut stream = stream;
         if self.peers.contains_key(&hello.id) {
             error!(
                 "We have already seen peer with ID {}. Rejecting incoming connection.",
@@ -219,7 +214,7 @@ impl SeedNode {
             port: peer_sockaddr.port(),
         };
         // say hello back to the peer
-        self.say_hello_to_peer(&mut stream)?;
+        self.say_hello_to_peer(stream)?;
         // create a new RemotePeer instance
         let remote_peer =
             match RemotePeer::new(hello.id.clone(), stream.try_clone()?, self.sender.clone()) {
