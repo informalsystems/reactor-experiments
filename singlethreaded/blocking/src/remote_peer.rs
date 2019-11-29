@@ -101,7 +101,7 @@ fn remote_peer_send_loop(
         })?;
         // try to write the incoming message out to the stream
         // if it fails, we just disconnect the peer
-        let _ = writer.write_peer_message(msg).map_err(|e| {
+        writer.write_peer_message(msg).map_err(|e| {
             let _ = node_channel.try_send(Event::Peer(PeerEvent::Disconnect(id.clone())));
             RemotePeerError::SendFailed(e.to_string())
         })?;
