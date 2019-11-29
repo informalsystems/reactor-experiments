@@ -36,7 +36,11 @@ fn main() -> std::io::Result<()> {
         bind_host: opt.host,
         bind_port: opt.port,
     };
-    let log_level = if opt.verbose { Level::Debug } else { Level::Info };
+    let log_level = if opt.verbose {
+        Level::Debug
+    } else {
+        Level::Info
+    };
     simple_logger::init_with_level(log_level).unwrap();
 
     info!(

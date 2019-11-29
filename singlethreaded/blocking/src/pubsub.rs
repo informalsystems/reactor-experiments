@@ -5,8 +5,8 @@
 use crate::events::{Event, EventID};
 use crate::types::SubscriptionID;
 use crossbeam::channel;
-use std::collections::{HashMap, HashSet};
 use log::debug;
+use std::collections::{HashMap, HashSet};
 
 /// A subscription to a particular set of event IDs.
 #[derive(Debug, Clone)]

@@ -9,7 +9,7 @@ use crate::pubsub;
 use crate::remote_peer::RemotePeer;
 use crate::types::{AddressBook, PeerAddr, PeerHello, SubscriptionID, ID};
 use crossbeam::channel;
-use log::{error, info, debug};
+use log::{debug, error, info};
 use std::collections::{HashMap, HashSet};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
@@ -66,7 +66,10 @@ impl SeedNode {
         ))?;
         let server_addr = listener.local_addr()?;
         let bound_address = format!("{}:{}", server_addr.ip(), server_addr.port());
-        info!("Server for peer {} bound to: {}", self.config.id, bound_address);
+        info!(
+            "Server for peer {} bound to: {}",
+            self.config.id, bound_address
+        );
         self.bound_address = Some(bound_address);
 
         // This is our only way of having the thread communicate with the parent
@@ -163,7 +166,7 @@ impl SeedNode {
             Ok(_) => {
                 debug!("Published event: {:?}", ev);
                 Ok(())
-            },
+            }
             Err(e) => match e {
                 pubsub::SubscriptionError::NoEventIDForEvent => Ok(()),
                 _ => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
@@ -351,7 +354,9 @@ mod tests {
         let _ = join_handle3.join().unwrap();
     }
 
-    fn spawn_test_peer(id: ID) -> (
+    fn spawn_test_peer(
+        id: ID,
+    ) -> (
         thread::JoinHandle<std::io::Result<()>>,
         channel::Sender<Event>,
         String,
