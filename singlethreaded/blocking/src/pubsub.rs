@@ -43,9 +43,11 @@ impl std::fmt::Display for SubscriptionError {
     }
 }
 
-/// Designed to provide O(1) lookup time by way of event ID (probably the most
-/// frequently called operation), but more linear time for addition/removal of a
-/// subscription (relative to the number of event IDs being tracked).
+/// `Subscriptions` is a data structure that tracks subscriptions to specific
+/// event IDs (`EventID`). Each event ID can have multiple subscriptions, each
+/// of which is uniquely identified by a subscription ID (`SubscriptionID`) and
+/// a sending end of a Crossbeam channel that allows us to send `Event`
+/// instances to that channel.
 #[derive(Debug, Clone)]
 pub struct Subscriptions {
     by_event_id: HashMap<EventID, HashMap<SubscriptionID, channel::Sender<Event>>>,
@@ -61,6 +63,9 @@ impl Subscriptions {
     }
 
     /// Adds a subscription with the given parameters.
+    ///
+    /// NB: It is important to not provide channels here that would block,
+    /// otherwise this would potentially block the entire pub/sub mechanism.
     pub fn add(&mut self, subs: Subscription) -> Result<(), SubscriptionError> {
         if self.subscription_ids.contains(&subs.id) {
             return Err(SubscriptionError::IDAlreadyExists);
@@ -78,7 +83,12 @@ impl Subscriptions {
         Ok(())
     }
 
-    /// Attempts to publish the given event to all subscribers
+    /// Attempts to publish the given event to all subscribers.
+    ///
+    /// Operates in O(N) time relative to the number of subscriptions for the
+    /// given event type. We assume that, since this is an internal pub/sub
+    /// mechanism, we will probably have fewer than 10 subscribers for most
+    /// event types (possibly at most 1 or 2).
     pub fn publish(&self, ev: Event) -> Result<(), SubscriptionError> {
         debug!("Attempting to publish event: {:?}", ev);
         let event_id = ev.id().ok_or(SubscriptionError::NoEventIDForEvent)?;
