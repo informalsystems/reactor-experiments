@@ -33,6 +33,7 @@ pub struct SeedNodeConfig {
     pub id: ID,
     pub bind_host: String,
     pub bind_port: u16,
+    PeerResponse(
 }
 
 impl SeedNode {
@@ -300,17 +301,21 @@ mod tests {
     fn test_basic_peer_interaction() {
         test_setup();
 
-        let (join_handle1, tx1, _) = spawn_test_peer(ID::from("1"));
+        let (join_handle1, tx1, _) = spawn_test_peer(ID::from("1")); // This creates a sender
         let (join_handle2, tx2, addr2) = spawn_test_peer(ID::from("2"));
         let (join_handle3, tx3, addr3) = spawn_test_peer(ID::from("3"));
-        let (notify_tx1, notify_rx1) = channel::unbounded::<Event>();
+        let (notify_tx1, notify_rx1) = channel::bounded::<Event>(0);
 
+        // so this is interesting, we send in a channel to get notified when a in this thread when
+        // a node processes a message
+        //
         // we want to know from peer 1 when a peer has connected to us
         tx1.send(Event::PubSub(PubSubRequest::Subscribe(
             pubsub::Subscription {
                 id: SubscriptionID::new(),
                 event_ids: [EventID::PeerAddedToAddressBook].iter().cloned().collect(),
-                notify: notify_tx1,
+                // Is this effectively a callback?
+                notify: notify_tx1, // What is the role of notify here?
             },
         )))
         .unwrap();
