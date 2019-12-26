@@ -33,7 +33,6 @@ pub struct SeedNodeConfig {
     pub id: ID,
     pub bind_host: String,
     pub bind_port: u16,
-    PeerResponse(
 }
 
 impl SeedNode {
