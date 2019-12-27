@@ -1,6 +1,11 @@
-use crate::types::{AddressBook, PeerID, Event};
 use crossbeam::channel;
 use std::thread;
+use crate::types::{Event, AddressBook, PeerID};
+
+// One big question is, why verify events instead of state
+// * Because events are the public API for asynchronous components
+// * Our expectations is that event processing is deterministic, as in, a sequence of events
+// provided in order will always produce the same set of events
 
 #[derive(Debug, Clone)]
 pub struct SeedNodeConfig {
@@ -10,34 +15,42 @@ pub struct SeedNodeConfig {
 }
 
 pub struct SeedNode {
-    sender: channel::Sender<Event>,
-    receiver: channel::Receiver<Event>,
+    node_in_sender: channel::Sender<Event>,
+    node_in_receiver: channel::Receiver<Event>,
+    node_out_sender: channel::Sender<Event>,
+    node_out_receiver: channel::Receiver<Event>,
 }
 
 impl SeedNode {
-    // How do you do error handling here?
     pub fn new(config: SeedNodeConfig) -> SeedNode {
-        // create an address book
-        let (sender, receiver) = channel::unbounded::<Event>();
+        let (node_in_sender, node_in_receiver) = channel::unbounded::<Event>();
+        let (node_out_sender, node_out_receiver) = channel::unbounded::<Event>();
         return SeedNode {
-            sender: sender,
-            receiver: receiver,
+            node_in_sender,
+            node_in_receiver,
+            node_out_sender,
+            node_out_receiver,
         }
     }
 
     pub fn run(&mut self) {
-        let fsm_send = self.sender.clone();
-        let fsm_rcv = self.receiver.clone();
+        let sender = self.node_out_sender.clone();
+        let receiver = self.node_in_receiver.clone();
 
         let address_book = AddressBook::new();
         let fsm_thread = thread::spawn(move || {
-            address_book.run_fsm(fsm_rcv, fsm_send);
+            address_book.run_fsm(sender, receiver);
         });
-
     }
 
+    //pub fn wait(&self) {
+    //    // join on each handler
+    //    self.handlers
+    //}
+
     fn handle(&mut self, event: Event) {
-        self.sender.send(event);
+        println!("Sending event into node");
+        self.node_in_sender.send(event);
     }
 }
 
@@ -55,6 +68,22 @@ mod tests {
 
         peer.run();
         peer.handle(Event::Terminate());
+
+        for event in peer.node_out_receiver.iter() {
+            // XXX: might be interesting to be able to consume an iteration of state here
+            // we need to close the handler to exit this loop
+            println!("Node output {:?}", event);
+            match event {
+                Event::Terminated() => {
+                    return
+                },
+                _ => {
+                    // do nothing
+                }
+
+            }
+        }
+        // read from the output until closed
     }
 }
 

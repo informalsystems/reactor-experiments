@@ -3,24 +3,21 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use crossbeam::channel;
 
-// What is the taxonomy of events?
-// Each input event produces an output event
-// Events come from someone
-// Events can be Sent to someone
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    AddPeer(PeerID),   // from p2p
-    PeerAdded(PeerID), // to dev/null
+    AddPeer(Entry),
+    PeerAdded(PeerID),
     PeersAdded(PeerList),
 
-    PollTrigger(), // from ticker
-    PollPeers(PeerList), // Goto p2p
+    PollTrigger(),
+    PollPeers(PeerList),
 
     PeerEvent(PeerID, PeerMessage),
 
-    Terminate(), // from OS
-    Terminated(), // to seed_node
+    Terminate(),
+    Terminated(),
+
+    Error(),
 
     NoOp(),
 }
@@ -48,9 +45,9 @@ pub struct Entry {
 impl Entry {
     fn new(id: PeerID, ip: IpAddr, port: u16) -> Entry {
         return Entry {
-            id: "".to_string(),
-            ip: IpAddr::from_str("127.0.0.1").unwrap(),
-            port: 0,
+            id: id,
+            ip: ip,
+            port: port,
         }
     }
 
@@ -75,18 +72,20 @@ impl AddressBook {
         }
     }
 
-    // We can Take requests
-    // we can also issue requests
-    // We need to produce responses which can be routed to the peer to peer layer
     fn handle(&mut self, event: Event) -> Event {
         match event {
-            Event::AddPeer(peer_id) => { // will need PeerInfo
-                // TODO: Add to address_book
-                return Event::PeerAdded(peer_id);
+            Event::AddPeer(entry) => { // will need PeerInfo
+                if self.mapping.contains_key(&entry.id) {
+                    return Event::NoOp();
+                } else {
+                    println!("Adding peer {:?}", entry);
+                    self.mapping.insert(entry.id.clone(), entry.clone());
+                    return Event::PeerAdded(entry.id);
+                }
             },
             Event::PollTrigger() => {
                 // TODO: Choose LRU 20
-                let requested_peers = vec![PeerID::from("1")];
+                let requested_peers = self.mapping.keys().map(|x| x.to_string()).collect();
                 return Event::PollPeers(requested_peers);
             },
             Event::PeerEvent(peer_id, message) => {
@@ -102,7 +101,6 @@ impl AddressBook {
                 }
             },
             Event::Terminate() => {
-                // cleanup
                 return Event::Terminated();
             },
             _ => {
@@ -111,17 +109,24 @@ impl AddressBook {
         }
     }
 
-    // Consume The address book
-    pub fn run_fsm(mut self, rcv_ch: channel::Receiver<Event>, send_ch: channel::Sender<Event>) {
+    // This can probably be generalized for all runners
+    pub fn run_fsm(mut self, send_ch: channel::Sender<Event>, rcv_ch: channel::Receiver<Event>) {
         'event_loop: loop {
-            let input = rcv_ch.recv().unwrap();
-            // I don't think it's possible to mutable borrow here
-            // we need the FSM to be a seperate structure
-            println!("Event loop received {:?}", input);
-            let output = self.handle(input);
+            let output = match rcv_ch.recv() {
+                Ok(event) => {
+                    println!("Event loop received {:?}", event);
+                    self.handle(event)
+                },
+                _ => {
+                    // would most likely make sense to return an error here
+                    send_ch.send(Event::Error());
+                    break 'event_loop;
+                }
+            };
             match output {
-                Event::Terminate() => {
+                Event::Terminated() => {
                     println!("Terminating");
+                    send_ch.send(Event::Terminated());
                     break 'event_loop;
                 },
                 _ => {
@@ -132,9 +137,6 @@ impl AddressBook {
         }
     }
 }
-
-// What is the best way way to produce an address book literal?
-// With From
 
 type Entries = Vec<(PeerID, Entry)>;
 impl From<Entries> for AddressBook {
@@ -159,8 +161,12 @@ mod tests {
     #[test]
     fn test_fsm() {
         let mut address_book = AddressBook::new();
+        let id = PeerID::from("2");
+        let ip_addr = IpAddr::from_str("127.0.0.1").unwrap();
+        let port: u16 = 0;
+        let entry = Entry::new(id.clone(), ip_addr.clone(), port);
         let sequence = vec![
-            (Event::AddPeer(PeerID::from("2")), Event::PeerAdded(PeerID::from("2"))),
+            (Event::AddPeer(entry), Event::PeerAdded(id.clone())),
             (Event::PollTrigger(), Event::PollPeers(vec![PeerID::from("2")])), 
 
             // TODO: PollRequest
@@ -173,7 +179,7 @@ mod tests {
 
         for (input, expected_output) in sequence.into_iter() {
             let output = address_book.handle(input);
-            assert_eq!(output, expected_output);
+            assert_eq!(output, expected_output, "expected equality");
         }
     }
     // todo async sequence
