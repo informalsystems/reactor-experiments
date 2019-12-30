@@ -20,12 +20,15 @@ pub enum Event {
     Error(),
 
     NoOp(),
+    Modified(),
 }
+
+type Mapping = HashMap<PeerID, Entry>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PeerMessage {
     AddressBookRequest(),
-    AddressBookResponse(AddressBook),
+    AddressBookResponse(Mapping),
 }
 
 pub type PeerID = String;
@@ -90,13 +93,17 @@ impl AddressBook {
             },
             Event::PeerEvent(peer_id, message) => {
                 match message {
-                   PeerMessage::AddressBookRequest() => {
-                       let message = PeerMessage::AddressBookResponse(self.clone());
-                        return Event::PeerEvent(peer_id, message);
+                    PeerMessage::AddressBookRequest() => {
+                       let message = PeerMessage::AddressBookResponse(self.mapping.clone());
+                       return Event::PeerEvent(peer_id, message);
                     },
-                    PeerMessage::AddressBookResponse(address_book) => {
-                        // TODO: merge address books and return peers added
-                        return Event::NoOp();
+                    PeerMessage::AddressBookResponse(mapping) => {
+                        if mapping == self.mapping {
+                            return Event::NoOp();
+                        } else {
+                            self.mapping.extend(mapping);
+                            return Event::Modified();
+                        }
                     },
                 }
             },
@@ -158,23 +165,43 @@ impl From<Entries> for AddressBook {
 mod tests {
     use super::*;
 
+    // XXX: rename PeerEvent PeerMessage
     #[test]
     fn test_fsm() {
         let mut address_book = AddressBook::new();
+
         let id = PeerID::from("2");
         let ip_addr = IpAddr::from_str("127.0.0.1").unwrap();
         let port: u16 = 0;
-        let entry = Entry::new(id.clone(), ip_addr.clone(), port);
-        let sequence = vec![
-            (Event::AddPeer(entry), Event::PeerAdded(id.clone())),
-            (Event::PollTrigger(), Event::PollPeers(vec![PeerID::from("2")])), 
+        let peer_1_entry = Entry::new(PeerID::from("1"), ip_addr.clone(), port);
+        let peer_2_entry = Entry::new(PeerID::from("2"), ip_addr.clone(), port);
+        let peer_3_entry = Entry::new(PeerID::from("3"), ip_addr.clone(), port);
 
-            // TODO: PollRequest
-            /*
-            (Event::PeerRequest(PeerID::from("2")), Event::PollResponse(
-                    AddressBook::from(
-                        vec![(PeerID::from("2"), Entry::default())]))),
-            */
+        let peer_2_mapping: Mapping = [(PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect();
+
+        let sequence = vec![
+            // System adds peer
+            (Event::AddPeer(peer_2_entry.clone()),
+		Event::PeerAdded(PeerID::from("2"))),
+
+	    // Adding again should do nothing
+            (Event::AddPeer(peer_2_entry.clone()),
+		Event::NoOp()),
+
+            // System triggers a polling operation
+            (Event::PollTrigger(), Event::PollPeers(vec![PeerID::from("2")])),
+
+            // p2p layer will take PollPeer event and generate requests...
+
+            // Peer:2 responds with an address Book containing peer 3
+            (Event::PeerEvent(PeerID::from("2"),  PeerMessage::AddressBookResponse(peer_2_mapping)),
+		Event::Modified()),
+
+	    // peer 2 then asks peer:1 for address book which contains peer 3
+            (Event::PeerEvent(PeerID::from("2"), PeerMessage::AddressBookRequest()),
+                Event::PeerEvent(id.clone(), PeerMessage::AddressBookResponse(
+		    [(PeerID::from("2"), peer_2_entry.clone()),
+		     (PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect()))),
         ];
 
         for (input, expected_output) in sequence.into_iter() {
