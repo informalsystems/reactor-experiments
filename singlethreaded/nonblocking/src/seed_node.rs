@@ -30,17 +30,27 @@ impl SeedNode {
             node_in_receiver,
             node_out_sender,
             node_out_receiver,
+            connection_manager: ConnectionManager::new(),
         }
     }
 
     pub fn run(&mut self) {
+
         let sender = self.node_out_sender.clone();
         let receiver = self.node_in_receiver.clone();
+
+        // start a p2p layer
+        // input fsm, output to fsm
+
+        let connection_manager = ConnectionManager::new();
+        // from connection manager to the address book
+        // from the address_book to the connection manager
 
         let address_book = AddressBook::new();
         let fsm_thread = thread::spawn(move || {
             address_book.run_fsm(sender, receiver);
         });
+
     }
 
     //pub fn wait(&self) {
@@ -70,8 +80,6 @@ mod tests {
         peer.handle(Event::Terminate());
 
         for event in peer.node_out_receiver.iter() {
-            // XXX: might be interesting to be able to consume an iteration of state here
-            // we need to close the handler to exit this loop
             println!("Node output {:?}", event);
             match event {
                 Event::Terminated() => {
