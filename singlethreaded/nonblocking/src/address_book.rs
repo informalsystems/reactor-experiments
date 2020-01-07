@@ -148,10 +148,10 @@ impl AddressBook {
 type Entries = Vec<(PeerID, Entry)>;
 impl From<Entries> for AddressBook {
     fn from(entries: Entries) -> Self {
-	let mapping: HashMap<PeerID, Entry> = entries.iter().cloned().collect();
-	return AddressBook {
+        let mapping: HashMap<PeerID, Entry> = entries.iter().cloned().collect();
+        return AddressBook {
             mapping,
-	}
+        }
     }
 }
 
@@ -182,11 +182,11 @@ mod tests {
         let sequence = vec![
             // System adds peer
             (Event::AddPeer(peer_2_entry.clone()),
-		Event::PeerAdded(PeerID::from("2"))),
+                Event::PeerAdded(PeerID::from("2"))),
 
-	    // Adding again should do nothing
+            // Adding again should do nothing
             (Event::AddPeer(peer_2_entry.clone()),
-		Event::NoOp()),
+                Event::NoOp()),
 
             // System triggers a polling operation
             (Event::PollTrigger(), Event::PollPeers(vec![PeerID::from("2")])),
@@ -195,13 +195,13 @@ mod tests {
 
             // Peer:2 responds with an address Book containing peer 3
             (Event::PeerEvent(PeerID::from("2"),  PeerMessage::AddressBookResponse(peer_2_mapping)),
-		Event::Modified()),
+                Event::Modified()),
 
-	    // peer 2 then asks peer:1 for address book which contains peer 3
+            // peer 2 then asks peer:1 for address book which contains peer 3
             (Event::PeerEvent(PeerID::from("2"), PeerMessage::AddressBookRequest()),
                 Event::PeerEvent(id.clone(), PeerMessage::AddressBookResponse(
-		    [(PeerID::from("2"), peer_2_entry.clone()),
-		     (PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect()))),
+                    [(PeerID::from("2"), peer_2_entry.clone()),
+                    (PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect()))),
         ];
 
         for (input, expected_output) in sequence.into_iter() {
