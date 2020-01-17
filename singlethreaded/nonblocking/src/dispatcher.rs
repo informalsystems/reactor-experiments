@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use crate::address_book::{Event, PeerID, Error};
 use crate::encoding;
 use tokio::sync::mpsc;
+use futures::prelude::*;
 
 pub struct Dispatcher {
     peers: HashMap<PeerID, mpsc::Sender<Event>>,
@@ -68,14 +69,14 @@ async fn run_peer_thread(
     let (tosend_serializer, received_deserializer) = encoding::create_both(stream);
     loop {
         select! {
-            msg = received_deserializer.try_next().fuse() => {
-                let msg = msg.unwrap(); // This will panic on done, instead we should match
-                received_ch.send(Event::FromPeer(peer_id.clone(), msg)).await.unwrap();
-            },
+            //msg = received_deserializer.try_next().fuse() => {
+            //    let msg = msg.unwrap(); // This will panic on done, instead we should match
+            //    received_ch.send(Event::FromPeer(peer_id.clone(), msg)).await.unwrap();
+            //},
             Some(event) = tosend_ch.recv().fuse() => {
                 match event {
                     Event::ToPeer(peer_d, message) => {
-                        tosend_serializer.send(message).await.unwrap();
+                        //tosend_serializer.send(message).await.unwrap();
                     },
                     _ => {
                         panic!("dunno how to send this");

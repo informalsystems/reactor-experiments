@@ -9,7 +9,7 @@ pub enum Error {
     PeerNotFound(),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Event {
     AddPeer(Entry),
     PeerAdded(PeerID),
@@ -102,11 +102,11 @@ impl AddressBook {
                 let requested_peers = self.mapping.keys().map(|x| x.to_string()).collect();
                 return Event::PollPeers(requested_peers);
             },
-            Event::PeerEvent(peer_id, message) => {
+            Event::FromPeer(peer_id, message) => {
                 match message {
                     PeerMessage::AddressBookRequest() => {
                        let message = PeerMessage::AddressBookResponse(self.mapping.clone());
-                       return Event::PeerEvent(peer_id, message);
+                       return Event::ToPeer(peer_id, message);
                     },
                     PeerMessage::AddressBookResponse(mapping) => {
                         if mapping == self.mapping {
@@ -141,7 +141,7 @@ impl AddressBook {
                 },
                 _ => {
                     // would most likely make sense to return an error here
-                    send_ch.send(Event::Error());
+                    // send_ch.send(Event::Error());
                     break 'event_loop;
                 }
             };
@@ -180,7 +180,6 @@ impl From<Entries> for AddressBook {
 mod tests {
     use super::*;
 
-    // XXX: rename PeerEvent PeerMessage
     #[test]
     fn test_fsm() {
         let mut address_book = AddressBook::new();
@@ -209,12 +208,12 @@ mod tests {
             // p2p layer will take PollPeer event and generate requests...
 
             // Peer:2 responds with an address Book containing peer 3
-            (Event::PeerEvent(PeerID::from("2"),  PeerMessage::AddressBookResponse(peer_2_mapping)),
+            (Event::FromPeer(PeerID::from("2"),  PeerMessage::AddressBookResponse(peer_2_mapping)),
                 Event::Modified()),
 
             // peer 2 then asks peer:1 for address book which contains peer 3
-            (Event::PeerEvent(PeerID::from("2"), PeerMessage::AddressBookRequest()),
-                Event::PeerEvent(id.clone(), PeerMessage::AddressBookResponse(
+            (Event::ToPeer(PeerID::from("2"), PeerMessage::AddressBookRequest()),
+                Event::PeerSend(id.clone(), PeerMessage::AddressBookResponse(
                     [(PeerID::from("2"), peer_2_entry.clone()),
                     (PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect()))),
         ];
