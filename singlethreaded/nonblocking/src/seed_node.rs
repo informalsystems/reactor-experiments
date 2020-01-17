@@ -1,6 +1,6 @@
 use crossbeam::channel;
 use std::thread;
-use crate::types::{Event, AddressBook, PeerID};
+use crate::address_book::{Event, AddressBook, PeerID};
 
 // One big question is, why verify events instead of state
 // * Because events are the public API for asynchronous components
@@ -30,7 +30,6 @@ impl SeedNode {
             node_in_receiver,
             node_out_sender,
             node_out_receiver,
-            connection_manager: ConnectionManager::new(),
         }
     }
 
@@ -42,13 +41,12 @@ impl SeedNode {
         // start a p2p layer
         // input fsm, output to fsm
 
-        let connection_manager = ConnectionManager::new();
         // from connection manager to the address book
         // from the address_book to the connection manager
 
         let address_book = AddressBook::new();
         let fsm_thread = thread::spawn(move || {
-            address_book.run_fsm(sender, receiver);
+            address_book.run(sender, receiver);
         });
 
     }

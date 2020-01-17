@@ -2,6 +2,12 @@ use std::net::IpAddr;
 use std::collections::HashMap;
 use std::str::FromStr;
 use crossbeam::channel;
+use tokio::net::TcpStream;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Error {
+    PeerNotFound(),
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
@@ -9,15 +15,19 @@ pub enum Event {
     PeerAdded(PeerID),
     PeersAdded(PeerList),
 
+    Connection(PeerID, TcpStream),
+    Connected(PeerID),
+
     PollTrigger(),
     PollPeers(PeerList),
 
-    PeerEvent(PeerID, PeerMessage),
+    ToPeer(PeerID, PeerMessage),
+    FromPeer(PeerID, PeerMessage),
 
     Terminate(),
     Terminated(),
 
-    Error(),
+    Error(Error),
 
     NoOp(),
     Modified(),
@@ -27,6 +37,7 @@ type Mapping = HashMap<PeerID, Entry>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PeerMessage {
+    Hello(PeerID),
     AddressBookRequest(),
     AddressBookResponse(Mapping),
 }
@@ -105,6 +116,10 @@ impl AddressBook {
                             return Event::Modified();
                         }
                     },
+                    _ => {
+                        // TODO: what about Hello?
+                        return Event::NoOp()
+                    },
                 }
             },
             Event::Terminate() => {
@@ -117,7 +132,7 @@ impl AddressBook {
     }
 
     // This can probably be generalized for all runners
-    pub fn run_fsm(mut self, send_ch: channel::Sender<Event>, rcv_ch: channel::Receiver<Event>) {
+    pub fn run(mut self, send_ch: channel::Sender<Event>, rcv_ch: channel::Receiver<Event>) {
         'event_loop: loop {
             let output = match rcv_ch.recv() {
                 Ok(event) => {
