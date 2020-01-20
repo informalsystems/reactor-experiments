@@ -213,7 +213,7 @@ mod tests {
 
             // peer 2 then asks peer:1 for address book which contains peer 3
             (Event::ToPeer(PeerID::from("2"), PeerMessage::AddressBookRequest()),
-                Event::PeerSend(id.clone(), PeerMessage::AddressBookResponse(
+                Event::ToPeer(id.clone(), PeerMessage::AddressBookResponse(
                     [(PeerID::from("2"), peer_2_entry.clone()),
                     (PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect()))),
         ];
