@@ -117,6 +117,7 @@ impl AddressBook {
                     },
                     _ => {
                         // TODO: what about Hello?
+                        println!("miss on from peer");
                         return Event::NoOp()
                     },
                 }
@@ -125,6 +126,8 @@ impl AddressBook {
                 return Event::Terminated();
             },
             _ => {
+                println!("Miss on event type");
+                println!("Missed event: {:?}", event);
                 return Event::NoOp();
             },
         }
@@ -211,7 +214,7 @@ mod tests {
                 Event::Modified()),
 
             // peer 2 then asks peer:1 for address book which contains peer 3
-            (Event::ToPeer(PeerID::from("2"), PeerMessage::AddressBookRequest()),
+            (Event::FromPeer(PeerID::from("2"), PeerMessage::AddressBookRequest()),
                 Event::ToPeer(id.clone(), PeerMessage::AddressBookResponse(
                     [(PeerID::from("2"), peer_2_entry.clone()),
                     (PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect()))),

@@ -11,7 +11,6 @@ pub enum Event {
     PeerConnected(PeerID, TcpStream)
 }
 
-// So if we 
 pub type Acceptor {
     peer_id: PeerID;
 }
