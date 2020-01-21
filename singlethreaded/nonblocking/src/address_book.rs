@@ -9,14 +9,11 @@ pub enum Error {
     PeerNotFound(),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     AddPeer(Entry),
+    // RemovePeer
     PeerAdded(PeerID),
-    PeersAdded(PeerList),
-
-    Connection(PeerID, TcpStream),
-    Connected(PeerID),
 
     PollTrigger(),
     PollPeers(PeerList),
@@ -74,6 +71,8 @@ impl Entry {
     }
 }
 
+// Events
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct AddressBook {
     mapping: HashMap<PeerID, Entry>,
@@ -113,7 +112,7 @@ impl AddressBook {
                             return Event::NoOp();
                         } else {
                             self.mapping.extend(mapping);
-                            return Event::Modified();
+                            return Event::Modified(); // XXX: Produce diff
                         }
                     },
                     _ => {

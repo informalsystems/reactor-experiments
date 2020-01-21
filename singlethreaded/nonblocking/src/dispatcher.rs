@@ -1,16 +1,31 @@
 use tokio;
 use futures::{
     future::FutureExt, // for `.fuse()`
-    pin_mut,
     select,
 };
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 use std::collections::HashMap;
 
-use crate::address_book::{PeerMessage, Event, PeerID, Error};
+use crate::address_book::{PeerMessage, PeerID};
 use crate::encoding;
-use tokio::sync::mpsc;
-//use futures::prelude::*;
+//use futures::prelude::*; // XXX: Remove this?
+
+#[derive(Debug)]
+pub enum Event {
+    Connected(PeerID, TcpStream),
+    AddPeer(PeerID),
+
+    FromPeer(PeerID, PeerMessage),
+    ToPeer(PeerID, PeerMessage),
+
+    Error(Error),
+}
+
+#[derive(Debug)]
+pub enum Error {
+    PeerNotFound(PeerID)
+}
 
 pub struct Dispatcher {
     peers: HashMap<PeerID, mpsc::Sender<PeerMessage>>,
@@ -28,7 +43,7 @@ impl Dispatcher {
         loop {
             if let Some(event) = rcv_ch.recv().await {
                 match event {
-                    Event::Connection(peer_id, stream) => {
+                    Event::Connected(peer_id, stream) => {
                         let peer_output = tosend_ch.clone();
                         let (mut peer_sender, mut peer_receiver) = mpsc::channel::<PeerMessage>(0);
 
@@ -41,13 +56,13 @@ impl Dispatcher {
                         self.peers.insert(peer_id.clone(), peer_sender).unwrap();
 
                         let event_peer_id = peer_id.clone();
-                        tosend_ch.send(Event::Connected(peer_id)).await.unwrap();
+                        tosend_ch.send(Event::AddPeer(peer_id)).await.unwrap();
                     },
                     Event::ToPeer(peer_id, message) => {
                         if let Some(peer) = self.peers.get_mut(&peer_id)  {
                             peer.send(message).await.unwrap();
                         } else {
-                            tosend_ch.send(Event::Error(Error::PeerNotFound())).await.unwrap();
+                            tosend_ch.send(Event::Error(Error::PeerNotFound(peer_id))).await.unwrap();
                         }
                     },
                     // TODO: Handle Peer Removal
