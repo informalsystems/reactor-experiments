@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use crossbeam::channel;
 use tokio::net::TcpStream;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
@@ -32,7 +33,7 @@ pub enum Event {
 
 type Mapping = HashMap<PeerID, Entry>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PeerMessage {
     Hello(PeerID),
     AddressBookRequest(),
@@ -43,7 +44,7 @@ pub type PeerID = String;
 pub type PeerList = Vec<PeerID>;
 
 /// The address of a peer in the network.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Entry {
     /// The cryptographic address of this peer.
     pub id: PeerID,

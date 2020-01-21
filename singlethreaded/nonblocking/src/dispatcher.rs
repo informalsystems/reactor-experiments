@@ -9,7 +9,8 @@ use std::collections::HashMap;
 
 use crate::address_book::{PeerMessage, PeerID};
 use crate::encoding;
-//use futures::prelude::*; // XXX: Remove this?
+use futures::prelude::*; // XXX: Remove this?
+use tokio::prelude::*;
 
 #[derive(Debug)]
 pub enum Event {
@@ -81,16 +82,16 @@ impl Dispatcher {
 async fn run_peer_thread(
     peer_id: PeerID,
     mut tosend_ch: mpsc::Receiver<PeerMessage>, // Events to write to socket
-    received_ch: mpsc::Sender<Event>, // Events received from the socket and sent downstream
+    mut received_ch: mpsc::Sender<Event>, // Events received from the socket and sent downstream
     stream: TcpStream) { // socket to read and write to
 
-    let encoder  = encoding::create_encoder(stream);
+    let mut encoder  = encoding::create_encoder(stream);
     loop {
         select! {
-            //msg = received_deserializer.try_next().fuse() => {
-            //    let msg = msg.unwrap(); // This will panic on done, instead we should match
-            //    received_ch.send(Event::FromPeer(peer_id.clone(), msg)).await.unwrap();
-            //},
+            msg = encoder.try_next().fuse() => {
+                let msg = msg.unwrap().unwrap(); // This will panic on done, instead we should match
+                received_ch.send(Event::FromPeer(peer_id.clone(), msg)).await.unwrap();
+            },
             potential_peer_message = tosend_ch.recv().fuse() => {
                 if let Some(message) = potential_peer_message {
                     // TODO: serialize and write to socket
