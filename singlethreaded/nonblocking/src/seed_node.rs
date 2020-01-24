@@ -1,12 +1,20 @@
-use crossbeam::channel;
-use std::thread;
-use crate::address_book::{Event, AddressBook, PeerID};
+use tokio::task;
+use tokio::sync::mpsc;
+use crate::address_book::{Event as AddressBookEvent, AddressBook, PeerID};
+use crate::acceptor::Event as AcceptorEvent;
+use crate::dispatcher::Event as DispatcherEvent;
 
-// One big question is, why verify events instead of state
-// * Because events are the public API for asynchronous components
-// * Our expectations is that event processing is deterministic, as in, a sequence of events
-// provided in order will always produce the same set of events
+enum NodeEvent {
+    Connected(PeerID)
+}
+enum Event {
+    Node(NodeEvent),
+    AddressBook(AddressBookEvent),
+    Acceptor(AcceptorEvent),
+    Dispatcher(DispatcherEvent),
+}
 
+// XXX: Unify this with Entry
 #[derive(Debug, Clone)]
 pub struct SeedNodeConfig {
     pub id: PeerID,
@@ -15,50 +23,55 @@ pub struct SeedNodeConfig {
 }
 
 pub struct SeedNode {
-    node_in_sender: channel::Sender<Event>,
-    node_in_receiver: channel::Receiver<Event>,
-    node_out_sender: channel::Sender<Event>,
-    node_out_receiver: channel::Receiver<Event>,
 }
 
+
 impl SeedNode {
-    pub fn new(config: SeedNodeConfig) -> SeedNode {
-        let (node_in_sender, node_in_receiver) = channel::unbounded::<Event>();
-        let (node_out_sender, node_out_receiver) = channel::unbounded::<Event>();
-        return SeedNode {
-            node_in_sender,
-            node_in_receiver,
-            node_out_sender,
-            node_out_receiver,
-        }
+    fn new() -> SeedNode {
+        return SeedNode {}
     }
 
-    pub fn run(&mut self) {
-
-        let sender = self.node_out_sender.clone();
-        let receiver = self.node_in_receiver.clone();
-
-        // start a p2p layer
-        // input fsm, output to fsm
-
-        // from connection manager to the address book
-        // from the address_book to the connection manager
-
-        let address_book = AddressBook::new();
-        let fsm_thread = thread::spawn(move || {
-            address_book.run(sender, receiver);
+    async fn run(events_send: mpsc::channel<Sender>, events_receive: mpsc::channel<Receiver>) {
+        // Node we need to alig all the events
+        let (acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(0);
+        let acceptor = Acceptor::new(); // maybe pass  address and port
+        let acceptor_handler = task::spawn(async move {
+            acceptor.run(acceptor_receiver, event_send.clone());
         });
 
-    }
+        let (dispatcher_sender, dispatcher_receiver) = mpsc::channel::<Dispatcher>(0);
+        let dispatcher = Dispatcher::new();
+        let dispatcher_handler = task::spawn(async move {
+            dispatcher.run(dispatcher_receiver, event_send.clone());
+        }
 
-    //pub fn wait(&self) {
-    //    // join on each handler
-    //    self.handlers
-    //}
+        let (ab_sender, ab_receiver) = mpsc::channel::<>(0);
+        let address_book = AddressBook::new();
+        let ab_handler = task::spawn(async move {
+            dispatcher.run(dispatcher_receiver, event_send.clone());
+        }
 
-    fn handle(&mut self, event: Event) {
-        println!("Sending event into node");
-        self.node_in_sender.send(event);
+        while Some(event) = events_receive.recv().await {
+            match event {
+                Event::Connect(entry) => {
+                    acceptor.send(event);
+                },
+                Event::Connection(socket) => {
+                    dispatcher.send(event);
+                },
+                Event::Connected(peerID) => {
+                    // The peer has connected and is identified
+                    fsm.send(event);
+                },
+                Event::PeerReceive(peerID, Message) => {
+                    // message from peer, route the the fsm
+                    fsm.send(event);
+                },
+                Event::PeerSend(peerID, Message) => {
+                    dipatch.send(event);
+                },
+            }
+        }
     }
 }
 
@@ -67,29 +80,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_node() {
-        let mut peer = SeedNode::new(SeedNodeConfig {
+    fn test_network() {
+        let mut node1 = SeedNode::new(SeedNodeConfig {
             id: PeerID::from("1"),
             bind_host: "127.0.0.1".to_string(),
-            bind_port: 0,
+            bind_port: 8902,
         });
 
-        peer.run();
-        peer.handle(Event::Terminate());
+        let mut node2 = SeedNode::new(SeedNodeConfig {
+            id: PeerID::from("2"),
+            bind_host: "127.0.0.1".to_string(),
+            bind_port: 8903,
+        });
 
-        for event in peer.node_out_receiver.iter() {
-            println!("Node output {:?}", event);
+        let (node1_in_send, node1_in_recv) = mpsc::channel<Event>();
+        let (node1_out_send, node1_out_recv) = mpsc::channel<Event>();
+        task::spawn(move {
+            node1.run(node1_in_send, node1_out_send);
+        }
+        let (node2_in_send, node2_in_recv) = mpsc::channel<Event>();
+        let (node2_out_send, node2_out_recv) = mpsc::channel<Event>();
+        task::spawn(move {
+            node2.run(node2_out_send, node2_in_recv);
+        }
+
+        // TODO start timer
+
+        node1.send(Event::Connect(Entry::new(
+                    PeerID::from("2"), 
+                    "127.0.0.1".to_string(),
+                    8903);
+
+        let mut connected = 0;
+        let stream = futures::stream::select(node1_out_recv, node2_out_recv);
+        while Some(event) = stream.next().await {
             match event {
-                Event::Terminated() => {
-                    return
+                // These events should have a include the seed nodes peer ID
+                Event::Connected(peer_id) => {
+                    timer.touch = now;
+                    connected += 1;
                 },
-                _ => {
-                    // do nothing
-                }
-
             }
         }
-        // read from the output until closed
     }
 }
 

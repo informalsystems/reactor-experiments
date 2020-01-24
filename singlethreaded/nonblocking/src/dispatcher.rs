@@ -1,16 +1,14 @@
 use tokio;
 use futures::{
-    future::FutureExt, // for `.fuse()`
     select,
 };
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use std::collections::HashMap;
+use futures::prelude::*;
 
 use crate::address_book::{PeerMessage, PeerID};
 use crate::encoding;
-use futures::prelude::*; // XXX: Remove this?
-use tokio::prelude::*;
 
 #[derive(Debug)]
 pub enum Event {
@@ -43,6 +41,7 @@ impl Dispatcher {
     pub async fn run(mut self, mut tosend_ch: mpsc::Sender<Event>, mut rcv_ch: mpsc::Receiver<Event>) {
         loop {
             if let Some(event) = rcv_ch.recv().await {
+                // XXX: extrat this into a hande function
                 match event {
                     Event::Connected(peer_id, stream) => {
                         let peer_output = tosend_ch.clone();

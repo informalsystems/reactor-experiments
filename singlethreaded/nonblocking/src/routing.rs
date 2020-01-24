@@ -1,9 +1,10 @@
 use crate::acceptor::Acceptor;
 use crate::dispatcher::Dispatch;
-use crossbeam::channel;
+use crate::address_book::{Event, AddressBook, Entry};
+use tokio::sync::mpsc;
 use tokio::task;
 
-// Maybe do whole 
+// TODO: switch from crossbeam to tokio channels
 
 fn routing() {
     let (events_send, events_receive) = channel::unbounded<Event>();
@@ -26,10 +27,14 @@ fn routing() {
         dispatcher.run(dispatcher_receiver, event_send.clone());
     }
 
+    // so with a single queue, this is deterministic
     for event in events_receive.iter() {
         match event {
+            Event::Connect(entry) => {
+                acceptor.send(event);
+            },
             Event::Connection(socket) => {
-                // Establish a new peer
+                // if this were synchronous, (handle) it would be deterministic
                 dispatcher.send(event);
             },
             Event::Connected(peerID) => {

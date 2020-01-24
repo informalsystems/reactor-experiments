@@ -3,11 +3,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use crate::encoding;
-use crate::address_book::PeerMessage;
+use crate::address_book::{PeerMessage, Entry};
 
 #[derive(Debug)]
 pub enum Event {
-    FromPeer(PeerID)
+    Connect(Entry),
+    FromPeer(PeerID),
     PeerConnected(PeerID, TcpStream)
 }
 
@@ -26,6 +27,8 @@ impl Acceptor {
         let mut listener = TcpListener::bind(&addr).await;
         println!("Listening on {}", addr);
 
+
+        // TODO: Receve channel to alow acceptor to be told who to connect to
         while let Some(stream) = listener.incomming().try_next().await.unwrap() {
             let cb = send_ch.clone();
             let my_id = self.peer_id.clone();
