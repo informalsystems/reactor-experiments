@@ -7,13 +7,13 @@ use tokio::sync::mpsc;
 use std::collections::HashMap;
 use futures::prelude::*;
 
-use crate::address_book::{PeerMessage, PeerID};
+use crate::address_book::{PeerMessage, PeerID, Entry};
 use crate::encoding;
 
 #[derive(Debug)]
 pub enum Event {
     Connected(PeerID, TcpStream),
-    AddPeer(PeerID),
+    AddPeer(PeerID, Entry),
 
     FromPeer(PeerID, PeerMessage),
     ToPeer(PeerID, PeerMessage),
