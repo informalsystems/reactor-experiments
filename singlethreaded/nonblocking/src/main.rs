@@ -9,6 +9,7 @@ use std::error::Error;
 
 mod seed_node;
 mod address_book;
+mod acceptor;
 mod encoding;
 mod dispatcher;
 

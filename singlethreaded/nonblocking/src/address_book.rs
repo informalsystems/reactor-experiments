@@ -1,8 +1,8 @@
 use std::net::IpAddr;
 use std::collections::HashMap;
 use std::str::FromStr;
-use crossbeam::channel;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,7 +55,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    fn new(id: PeerID, ip: IpAddr, port: u16) -> Entry {
+    pub fn new(id: PeerID, ip: IpAddr, port: u16) -> Entry {
         return Entry {
             id: id,
             ip: ip,
@@ -63,7 +63,7 @@ impl Entry {
         }
     }
 
-    fn default() -> Entry {
+    pub fn default() -> Entry {
         return Entry {
             id: "".to_string(),
             ip: IpAddr::from_str("127.0.0.1").unwrap(),
@@ -135,7 +135,7 @@ impl AddressBook {
     }
 
     // This can probably be generalized for all runners
-    pub fn run(mut self, send_ch: channel::Sender<Event>, rcv_ch: channel::Receiver<Event>) {
+    pub fn run(mut self, send_ch: mpsc::Sender<Event>, rcv_ch: mpsc::Receiver<Event>) {
         'event_loop: loop {
             let output = match rcv_ch.recv() {
                 Ok(event) => {

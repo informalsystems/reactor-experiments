@@ -8,14 +8,15 @@ use tokio::net::TcpStream;
 use crate::address_book::{PeerMessage};
 
 type TcpFrame = Framed<TcpStream, LengthDelimitedCodec>;
-type JsonFrame = SymmetricallyFramed<TcpFrame, PeerMessage, SymmetricalJson<PeerMessage>>;
+// XXX: maybe rename to PeerMessageFramed
+pub type MessageFramed = SymmetricallyFramed<TcpFrame, PeerMessage, SymmetricalJson<PeerMessage>>;
 
-pub fn create_encoder(stream: TcpStream) -> JsonFrame {
+pub fn create_encoder(stream: TcpStream) -> MessageFramed {
     let tcp_frame = TcpFrame::new(
         stream,
         LengthDelimitedCodec::new());
 
-    let mut json_frame = JsonFrame::new(
+    let mut json_frame = MessgeFramed::new(
         tcp_frame,
         SymmetricalJson::<PeerMessage>::default(),
     );

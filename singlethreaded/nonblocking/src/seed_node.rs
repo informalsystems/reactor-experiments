@@ -1,14 +1,18 @@
+use futures::prelude::*;
+use tokio::prelude::*;
 use tokio::task;
 use tokio::sync::mpsc;
 use crate::address_book::{Event as AddressBookEvent, AddressBook, PeerID, Entry};
-use crate::acceptor::Event as AcceptorEvent;
-use crate::dispatcher::Event as DispatcherEvent;
+use crate::acceptor::{Acceptor, Event as AcceptorEvent};
+use crate::dispatcher::{Dispatcher, Event as DispatcherEvent};
 
+#[derive(Debug, Clone)]
 enum NodeEvent {
     Connect(PeerID, Entry),
     Connected(PeerID, PeerID) // when one peer connects to another
 }
 
+#[derive(Debug)]
 enum Event {
     Node(NodeEvent),
     AddressBook(AddressBookEvent),
@@ -16,77 +20,111 @@ enum Event {
     Dispatcher(DispatcherEvent),
 }
 
-// XXX: Unify this with Entry
-#[derive(Debug, Clone)]
-pub struct SeedNodeConfig {
-    pub id: PeerID,
-    pub bind_host: String,
-    pub bind_port: u16,
+impl From<AcceptorEvent> for Event {
+    fn from(item: AcceptorEvent) -> Self {
+        Event::AcceptorEvent(item)
+    }
 }
+
+// Can we convert Channel types?
+
+impl From<DispatcherEvent> for Event {
+    fn from(item: DispatcherEvent) -> Self {
+        Event::DispatcherEvent(item)
+    }
+}
+
+impl From<AcceptorEvent> for Event {
+    fn from(item: AcceptorEvent) -> Self {
+        Event::AcceptorEvent(item)
+    }
+}
+
+impl From<AddressBookEvent> for Event {
+    fn from(item: AddressBookEvent) -> Self {
+        Event::AddressBook(item)
+    }
+}
+
 
 pub struct SeedNode {
+    entry: Entry,
 }
 
-
+// we need some FROM impl for Event -> _Event
 impl SeedNode {
-    fn new() -> SeedNode {
-        return SeedNode {}
+    pub fn new(entry: Entry) -> SeedNode {
+        return SeedNode {entry}
     }
 
-    // We don't need content types on the channels?
-    async fn run(events_send: mpsc::channel<Sender>, events_receive: mpsc::channel<Receiver>) {
+    // Given how we are being diligent about the deployment of tasks as threads, it may be even
+    // simpler to avoid the tokio runtime and use threads with channels.
+
+    // Intead of using a single queue of events, and matching on the event type of. It might be
+    // simpler and better in terms of quality of service, to have seperate queues per component and
+    // then select between queues in the central routing table.
+    //
+    // Additionally, if we were to select on queues instead of on message types, one of the queues
+    // could be a channel which is populated periodically as a timer in order to coorinate
+    // timeouts.
+
+    // XXX: we need to implement the FROM trait to facilitate conversion between component specific events
+    async fn run(self, events_send: mpsc::Sender<Event>, events_receive: mpsc::Receiver<Event>) {
+        // The ergonomics here can be improved by changing run to a start
+        // which runs it's threads and returns the sender
         let (acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(0);
-        let acceptor = Acceptor::new(); // maybe pass  address and port
-        let acceptor_handler = task::spawn(async move {
-            acceptor.run(acceptor_receiver, event_send.clone());
+        let acceptor = Acceptor::new(self.entry.clone()); // maybe pass  address and port
+        let acceptor_handler = tokio::spawn(async move {
+            // how can we map sender
+            acceptor.run(events_send.clone(), acceptor_receiver);
         });
 
-        let (dispatcher_sender, dispatcher_receiver) = mpsc::channel::<Dispatcher>(0);
+        let (dispatcher_sender, dispatcher_receiver) = mpsc::channel::<DispatcherEvent>(0);
         let dispatcher = Dispatcher::new();
-        let dispatcher_handler = task::spawn(async move {
-            dispatcher.run(dispatcher_receiver, event_send.clone());
-        }
+        let dispatcher_handler = tokio::spawn(async move {
+            dispatcher.run(events_send.clone(), dispatcher_receiver);
+        });
 
-        let (ab_sender, ab_receiver) = mpsc::channel::<Event>(0);
+        let (ab_sender, ab_receiver) = mpsc::channel::<AddressBookEvent>(0);
         let address_book = AddressBook::new();
-        let ab_handler = task::spawn(async move {
-            dispatcher.run(dispatcher_receiver, event_send.clone());
-        }
+        let ab_handler = tokio::spawn(async move {
+            address_book.run(events_send.clone(), ab_receiver);
+        });
 
         // The Event translation can be replaced with From trait implementation
         // and the unwraps should bubble up to some kind of reasonable error handling
-        while Some(event) = events_receive.recv().await {
+        while let Some(event) = events_receive.recv().await {
             match event {
-                Event::NodeEvent(node_event) => {
-                    if let NodeEvent::Connect(entry) = node_event {
-                        acceptor_sender.send(AcceptorEvent::Connect(entry)).unwrap();
+                Event::Node(node_event) => {
+                    if let NodeEvent::Connect(peer_id, entry) = node_event {
+                        acceptor_sender.send(AcceptorEvent::Connect(entry)).await.unwrap();
                     }
                 },
-                Event::AcceptorEvent(acceptor_event) => {
-                    if let AcceptorEvent::PeerConnected(peer_id, TcpStream) = acceptor_event {
-                        dispatcher_sender.send(DispatcherEvent::PeerConnected(peer_id, TcpStream)).unwrap();
+                Event::Acceptor(acceptor_event) => {
+                    if let AcceptorEvent::PeerConnected(peer_id, stream) = acceptor_event {
+                        dispatcher_sender.send(DispatcherEvent::PeerConnected(peer_id, framed)).await.unwrap();
                     }
                 },
-                Event::DispatcherEvent(dispatcher_event) => {
+                Event::Dispatcher(dispatcher_event) => {
                     match dispatcher_event {
                         DispatcherEvent::AddPeer(peer_id, entry) => {
-                            address_book.send(AddressBookEvent::AddPeer(peer_id, msg)).unwrap();
+                            ab_sender.send(AddressBookEvent::AddPeer(entry)).await.unwrap();
                         },
                         DispatcherEvent::FromPeer(peer_id, msg) => {
-                            address_book.send(AddressBookEvent::FromPeer(peer_id, msg)).unwrap();
+                            ab_sender.send(AddressBookEvent::FromPeer(peer_id, msg)).await.unwrap();
                         },
                         _ => {
-                        }
-                    },
+                        },
+                    }
                 },
-                Event::AddressBookEvent(address_book_event) => {
+                Event::AddressBook(address_book_event) => {
                     match address_book_event {
                         AddressBookEvent::ToPeer(peer_id, msg) => {
-                            dispatcher.send(DispatcherEvent::ToPeer(peer_id, msg)).unwrap();
+                            dispatcher_sender.send(DispatcherEvent::ToPeer(peer_id, msg)).await.unwrap();
                         },
                         AddressBookEvent::PeerAdded(added_peer_id) => {
-                            let my_id = self.peer_id.clone();
-                            event_send.send(NodeEvent::PeerAdded(my_id, added_peer_id)).unwrap();
+                            let my_id = self.entry.id.clone();
+                            events_send.send(NodeEvent::Connected(my_id, added_peer_id)).await.unwrap();
                         },
                         _ => {
                         }
@@ -106,35 +144,36 @@ mod tests {
 
     #[test]
     fn test_network() {
-        let mut node1 = SeedNode::new(SeedNodeConfig {
-            id: PeerID::from("1"),
-            bind_host: "127.0.0.1".to_string(),
-            bind_port: 8902,
-        });
+        let mut node1 = SeedNode::new(Entry::new(
+            PeerID::from("1"),
+            "127.0.0.1".to_string(),
+            8902
+        ));
 
-        let mut node2 = SeedNode::new(SeedNodeConfig {
-            id: PeerID::from("2"),
-            bind_host: "127.0.0.1".to_string(),
-            bind_port: 8903,
-        });
+        let mut node2 = SeedNode::new(Entry::new(
+            PeerID::from("2"),
+            "127.0.0.1".to_string(),
+            8903
+        ));
 
-        let (node1_in_send, node1_in_recv) = mpsc::channel<Event>();
-        let (node1_out_send, node1_out_recv) = mpsc::channel<Event>();
-        task::spawn(move {
+        let (node1_in_send, node1_in_recv) = mpsc::channel::<Event>();
+        let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>();
+        task::spawn(async move {
             node1.run(node1_in_send, node1_out_send);
-        }
-        let (node2_in_send, node2_in_recv) = mpsc::channel<Event>();
-        let (node2_out_send, node2_out_recv) = mpsc::channel<Event>();
-        task::spawn(move {
+        });
+        let (node2_in_send, node2_in_recv) = mpsc::channel::<Event>();
+        let (node2_out_send, node2_out_recv) = mpsc::channel::<Event>();
+        task::spawn(async move {
             node2.run(node2_out_send, node2_in_recv);
-        }
+        });
 
         // TODO start timer
 
-        node1.send(Event::Connect(Entry::new(
-                    PeerID::from("2"), 
+        // can't do this if we consume node1
+        node1.send(NodeEvent::Connect(Entry::new(
+                    PeerID::from("2"),
                     "127.0.0.1".to_string(),
-                    8903);
+                    8903)));
 
         let mut connected = 0;
         let stream = futures::stream::select(node1_out_recv, node2_out_recv);

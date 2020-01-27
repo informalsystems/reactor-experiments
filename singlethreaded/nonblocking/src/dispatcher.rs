@@ -2,7 +2,6 @@ use tokio;
 use futures::{
     select,
 };
-use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use std::collections::HashMap;
 use futures::prelude::*;
@@ -12,7 +11,7 @@ use crate::encoding;
 
 #[derive(Debug)]
 pub enum Event {
-    Connected(PeerID, TcpStream),
+    PeerConnected(PeerID, MessageFramed),
     AddPeer(PeerID, Entry),
 
     FromPeer(PeerID, PeerMessage),
@@ -32,7 +31,7 @@ pub struct Dispatcher {
 
 //  The input is is every peers socket + the 
 impl Dispatcher {
-    fn new() -> Dispatcher {
+    pub fn new() -> Dispatcher {
         Dispatcher {
             peers: HashMap::<PeerID, mpsc::Sender<PeerMessage>>::new(),
         }
@@ -43,7 +42,7 @@ impl Dispatcher {
             if let Some(event) = rcv_ch.recv().await {
                 // XXX: extrat this into a hande function
                 match event {
-                    Event::Connected(peer_id, stream) => {
+                    Event::PeerConnected(peer_id, stream) => {
                         let peer_output = tosend_ch.clone();
                         let (mut peer_sender, mut peer_receiver) = mpsc::channel::<PeerMessage>(0);
 
@@ -56,7 +55,8 @@ impl Dispatcher {
                         self.peers.insert(peer_id.clone(), peer_sender).unwrap();
 
                         let event_peer_id = peer_id.clone();
-                        tosend_ch.send(Event::AddPeer(peer_id)).await.unwrap();
+                        // buah we need an Entry here
+                        tosend_ch.send(Event::AddPeer(peer_id, Entry::default())).await.unwrap();
                     },
                     Event::ToPeer(peer_id, message) => {
                         if let Some(peer) = self.peers.get_mut(&peer_id)  {
@@ -82,9 +82,8 @@ async fn run_peer_thread(
     peer_id: PeerID,
     mut tosend_ch: mpsc::Receiver<PeerMessage>, // Events to write to socket
     mut received_ch: mpsc::Sender<Event>, // Events received from the socket and sent downstream
-    stream: TcpStream) { // socket to read and write to
+    mut encoder: encoding::MessageFramed) { // socket to read and write to
 
-    let mut encoder  = encoding::create_encoder(stream);
     loop {
         select! {
             msg = encoder.try_next().fuse() => {
