@@ -5,6 +5,8 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use serde::{Deserialize, Serialize};
 
+use crate::seed_node::Event as EEvent;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     PeerNotFound(),
@@ -135,30 +137,10 @@ impl AddressBook {
     }
 
     // This can probably be generalized for all runners
-    pub fn run(mut self, send_ch: mpsc::Sender<Event>, rcv_ch: mpsc::Receiver<Event>) {
-        'event_loop: loop {
-            let output = match rcv_ch.recv() {
-                Ok(event) => {
-                    println!("Event loop received {:?}", event);
-                    self.handle(event)
-                },
-                _ => {
-                    // would most likely make sense to return an error here
-                    // send_ch.send(Event::Error());
-                    break 'event_loop;
-                }
-            };
-            match output {
-                Event::Terminated() => {
-                    println!("Terminating");
-                    send_ch.send(Event::Terminated());
-                    break 'event_loop;
-                },
-                _ => {
-                    println!("Handle output {:?}", output);
-                    send_ch.send(output);
-                }
-            }
+    pub async fn run(mut self, send_ch: mpsc::Sender<EEvent>, rcv_ch: mpsc::Receiver<Event>) {
+        while let Some(event) = rcv_ch.recv().await {
+            println!("Event loop received {:?}", event);
+            self.handle(event);
         }
     }
 }

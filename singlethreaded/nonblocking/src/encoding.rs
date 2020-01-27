@@ -1,6 +1,8 @@
 use futures::prelude::*;
 use tokio::prelude::*;
 
+use std::fmt;
+
 use tokio_serde::{SymmetricallyFramed, formats::SymmetricalJson};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use tokio::net::TcpStream;
@@ -11,12 +13,13 @@ type TcpFrame = Framed<TcpStream, LengthDelimitedCodec>;
 // XXX: maybe rename to PeerMessageFramed
 pub type MessageFramed = SymmetricallyFramed<TcpFrame, PeerMessage, SymmetricalJson<PeerMessage>>;
 
+
 pub fn create_encoder(stream: TcpStream) -> MessageFramed {
     let tcp_frame = TcpFrame::new(
         stream,
         LengthDelimitedCodec::new());
 
-    let mut json_frame = MessgeFramed::new(
+    let mut json_frame = MessageFramed::new(
         tcp_frame,
         SymmetricalJson::<PeerMessage>::default(),
     );

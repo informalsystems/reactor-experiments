@@ -8,10 +8,10 @@ use futures::prelude::*;
 
 use crate::address_book::{PeerMessage, PeerID, Entry};
 use crate::encoding;
+use crate::seed_node::Event as EEvent;
 
-#[derive(Debug)]
 pub enum Event {
-    PeerConnected(PeerID, MessageFramed),
+    PeerConnected(PeerID, encoding::MessageFramed),
     AddPeer(PeerID, Entry),
 
     FromPeer(PeerID, PeerMessage),
@@ -37,7 +37,7 @@ impl Dispatcher {
         }
     }
 
-    pub async fn run(mut self, mut tosend_ch: mpsc::Sender<Event>, mut rcv_ch: mpsc::Receiver<Event>) {
+    pub async fn run(mut self, mut tosend_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
         loop {
             if let Some(event) = rcv_ch.recv().await {
                 // XXX: extrat this into a hande function
@@ -56,13 +56,13 @@ impl Dispatcher {
 
                         let event_peer_id = peer_id.clone();
                         // buah we need an Entry here
-                        tosend_ch.send(Event::AddPeer(peer_id, Entry::default())).await.unwrap();
+                        tosend_ch.send(Event::AddPeer(peer_id, Entry::default()).into()).await;
                     },
                     Event::ToPeer(peer_id, message) => {
                         if let Some(peer) = self.peers.get_mut(&peer_id)  {
-                            peer.send(message).await.unwrap();
+                            peer.send(message).await;
                         } else {
-                            tosend_ch.send(Event::Error(Error::PeerNotFound(peer_id))).await.unwrap();
+                            tosend_ch.send(Event::Error(Error::PeerNotFound(peer_id)).into()).await;
                         }
                     },
                     // TODO: Handle Peer Removal
@@ -81,14 +81,14 @@ impl Dispatcher {
 async fn run_peer_thread(
     peer_id: PeerID,
     mut tosend_ch: mpsc::Receiver<PeerMessage>, // Events to write to socket
-    mut received_ch: mpsc::Sender<Event>, // Events received from the socket and sent downstream
+    mut received_ch: mpsc::Sender<EEvent>, // Events received from the socket and sent downstream
     mut encoder: encoding::MessageFramed) { // socket to read and write to
 
     loop {
         select! {
             msg = encoder.try_next().fuse() => {
                 let msg = msg.unwrap().unwrap(); // This will panic on done, instead we should match
-                received_ch.send(Event::FromPeer(peer_id.clone(), msg)).await.unwrap();
+                received_ch.send(Event::FromPeer(peer_id.clone(), msg).into()).await;
             },
             potential_peer_message = tosend_ch.recv().fuse() => {
                 if let Some(message) = potential_peer_message {

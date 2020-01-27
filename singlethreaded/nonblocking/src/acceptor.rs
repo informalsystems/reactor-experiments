@@ -6,8 +6,8 @@ use tokio::sync::mpsc;
 
 use crate::encoding;
 use crate::address_book::{PeerMessage, Entry, PeerID};
+use crate::seed_node::Event as EEvent;
 
-#[derive(Debug)]
 pub enum Event {
     Connect(Entry),
     FromPeer(PeerID),
@@ -27,11 +27,11 @@ pub struct Acceptor {
 // And so the routing table should compose a compbinator which could be used in deterministic
 // testing.
 impl Acceptor {
-    fn new(entry: Entry) -> Acceptor {
+    pub fn new(entry: Entry) -> Acceptor {
         return Acceptor { entry }
     }
 
-    pub async fn run(mut self, send_ch: mpsc::Sender<Event>, rcv_ch: mpsc::Receiver<Event>) {
+    pub async fn run(mut self, send_ch: mpsc::Sender<EEvent>, rcv_ch: mpsc::Receiver<Event>) {
         let addr = format!("{}:{}", self.entry.ip, self.entry.port);
 
         let mut listener = TcpListener::bind(&addr).await.unwrap();
@@ -49,7 +49,7 @@ impl Acceptor {
 
             let encoder = encoding::create_encoder(stream);
 
-            tokio::task(async move {
+            tokio::spawn(async move {
                 // First we say hello
                let msg = PeerMessage::Hello(my_id);
                encoder
@@ -59,7 +59,8 @@ impl Acceptor {
 
                 if let Some(msg) = encoder.try_next().await.unwrap() {
                     if let PeerMessage::Hello(peer_id) = msg {
-                        cb.send(Event::PeerConnected(peer_id, encoder)).await.unwrap();
+                        let oEvent: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
+                        cb.send(oEvent).await;
                     }
                 };
             });
