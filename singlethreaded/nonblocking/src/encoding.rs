@@ -19,7 +19,7 @@ pub fn create_encoder(stream: TcpStream) -> MessageFramed {
         stream,
         LengthDelimitedCodec::new());
 
-    let mut json_frame = MessageFramed::new(
+    let json_frame = MessageFramed::new(
         tcp_frame,
         SymmetricalJson::<PeerMessage>::default(),
     );

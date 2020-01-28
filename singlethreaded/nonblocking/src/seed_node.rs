@@ -71,26 +71,28 @@ impl SeedNode {
 
     // Conversino problem
     // Can we convert a Sender to a different type of sender?
-    async fn run(self, events_send: mpsc::Sender<Event>, events_receive: mpsc::Receiver<Event>) {
+    async fn run(self, mut events_send: mpsc::Sender<Event>, mut events_receive: mpsc::Receiver<Event>) {
         // The ergonomics here can be improved by changing run to a start
         // which runs it's threads and returns the sender
-        let (acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(0);
+        let (mut acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(0);
         let acceptor = Acceptor::new(self.entry.clone());
+        let acceptor_output_sender = events_send.clone();
         let acceptor_handler = tokio::spawn(async move {
-            // how can we map sender
-            acceptor.run(events_send.clone(), acceptor_receiver);
+            acceptor.run(acceptor_output_sender, acceptor_receiver);
         });
 
-        let (dispatcher_sender, dispatcher_receiver) = mpsc::channel::<DispatcherEvent>(0);
+        let (mut dispatcher_sender, dispatcher_receiver) = mpsc::channel::<DispatcherEvent>(0);
         let dispatcher = Dispatcher::new();
+        let dispatcher_output_sender = events_send.clone();
         let dispatcher_handler = tokio::spawn(async move {
-            dispatcher.run(events_send.clone(), dispatcher_receiver);
+            dispatcher.run(dispatcher_output_sender, dispatcher_receiver);
         });
 
-        let (ab_sender, ab_receiver) = mpsc::channel::<AddressBookEvent>(0);
+        let (mut ab_sender, ab_receiver) = mpsc::channel::<AddressBookEvent>(0);
         let address_book = AddressBook::new();
+        let ab_output_sender = events_send.clone();
         let ab_handler = tokio::spawn(async move {
-            address_book.run(events_send.clone(), ab_receiver);
+            address_book.run(ab_output_sender, ab_receiver);
         });
 
         // The Event translation can be replaced with From trait implementation

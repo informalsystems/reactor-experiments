@@ -44,10 +44,10 @@ impl Acceptor {
         // What the fuck is incomming
         // incomming returns Option<Result>
         while let Some(Ok(stream)) = listener.incoming().next().await {
-            let cb = send_ch.clone();
+            let mut cb = send_ch.clone();
             let my_id = self.entry.id.clone();
 
-            let encoder = encoding::create_encoder(stream);
+            let mut encoder = encoding::create_encoder(stream);
 
             tokio::spawn(async move {
                 // First we say hello
