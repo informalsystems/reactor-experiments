@@ -2,5 +2,6 @@
 
 members = [
     "singlethreaded/blocking",
+    "multithreaded",
 ]
 
