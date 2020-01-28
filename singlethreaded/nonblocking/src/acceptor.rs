@@ -1,6 +1,5 @@
 use tokio;
 use futures::prelude::*;
-use tokio::prelude::*;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 

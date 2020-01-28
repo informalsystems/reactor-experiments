@@ -103,7 +103,7 @@ async fn run_peer_thread(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
     // Test connection: passing in a stream
     // test Sending: Does it write to the stream

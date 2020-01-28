@@ -1,5 +1,4 @@
 use futures::prelude::*;
-use tokio::prelude::*;
 use std::net::IpAddr;
 use std::str::FromStr;
 use tokio::task;
@@ -146,53 +145,48 @@ impl SeedNode {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_network() {
-        let mut node1 = SeedNode::new(Entry::new(
+    use futures_await_test::async_test;
+    #[async_test]
+    async fn test_network() {
+        let ip_addr = IpAddr::from_str("127.0.0.1").unwrap();
+        let node1 = SeedNode::new(Entry::new(
             PeerID::from("1"),
-            IpAddr::from_str("127.0.0.1").unwrap(),
+            ip_addr.clone(),
             8902
         ));
 
-        let mut node2 = SeedNode::new(Entry::new(
+        let node2 = SeedNode::new(Entry::new(
             PeerID::from("2"),
-            IpAddr::from_str("127.0.0.1").unwrap(),
+            ip_addr.clone(),
             8903
         ));
 
-        /*
-        let (node1_in_send, node1_in_recv) = mpsc::channel::<Event>();
-        let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>();
+
+        let (mut node1_in_send, node1_in_recv) = mpsc::channel::<Event>(0);
+        let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>(0);
         task::spawn(async move {
-            node1.run(node1_in_send, node1_out_send);
+            node1.run(node1_out_send, node1_in_recv);
         });
-        let (node2_in_send, node2_in_recv) = mpsc::channel::<Event>();
-        let (node2_out_send, node2_out_recv) = mpsc::channel::<Event>();
+        let (node2_in_send, node2_in_recv) = mpsc::channel::<Event>(0);
+        let (node2_out_send, node2_out_recv) = mpsc::channel::<Event>(0);
         task::spawn(async move {
             node2.run(node2_out_send, node2_in_recv);
         });
 
-        // TODO start timer
-
-        // can't do this if we consume node1
-        node1.send(NodeEvent::Connect(Entry::new(
+        node1_in_send.send(Event::Node(NodeEvent::Connect(PeerID::from("2"), Entry::new(
                     PeerID::from("2"),
-                    "127.0.0.1".to_string(),
-                    8903)));
+                    ip_addr.clone(),
+                    8903))));
 
-        let mut connected = 0;
-        let stream = futures::stream::select(node1_out_recv, node2_out_recv);
+        let mut connected:i32 = 0;
+        let mut stream = futures::stream::select(node1_out_recv, node2_out_recv);
         while let Some(event) = stream.next().await {
-            match event {
-                // These events should have a include the seed nodes peer ID
-                Event::Connected(from_peer_id, to_peer_id) => {
-                    println!("Peer {} connected to {}", from_peer_id, to_peer_id);
-                    //timer.touch = now;
-                    connected += 1;
-                },
+            if let Event::Node(NodeEvent::Connected(from_peer_id, to_peer_id)) = event {
+                println!("Peer {} connected to {}", from_peer_id, to_peer_id);
+                //timer.touch = now;
+                connected += 1;
             }
         }
-        */
     }
 }
 

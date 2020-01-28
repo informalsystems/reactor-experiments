@@ -55,6 +55,7 @@ pub enum PeerEvent {
     ReceivedMessage { id: ID, msg: PeerMessage },
 
     /// Some part of the system needs to send a message to a particular peer.
+    #[allow(dead_code)]
     SendMessage { id: ID, msg: PeerMessage },
 
     /// A registered peer was disconnected, or we want to disconnect them.
@@ -103,6 +104,7 @@ pub enum PubSubRequest {
 
     /// Sent when an internal entity wants to terminate one or more
     /// subscriptions.
+    #[allow(dead_code)]
     Unsubscribe(HashSet<SubscriptionID>),
 }
 

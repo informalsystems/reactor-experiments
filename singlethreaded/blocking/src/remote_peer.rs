@@ -69,6 +69,7 @@ impl RemotePeer {
     /// Attempts to send a message to this peer. Technically, this sends the
     /// message to the peer's network write routine, which will attempt to
     /// serialize the message and send it out to the peer.
+    #[allow(dead_code)]
     pub fn send(&self, msg: PeerMessage) -> Result<(), RemotePeerError> {
         if let Err(e) = self.sender_channel.send(msg) {
             return Err(RemotePeerError::SendFailed(e.to_string()));

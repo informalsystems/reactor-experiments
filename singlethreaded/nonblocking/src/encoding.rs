@@ -1,8 +1,3 @@
-use futures::prelude::*;
-use tokio::prelude::*;
-
-use std::fmt;
-
 use tokio_serde::{SymmetricallyFramed, formats::SymmetricalJson};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use tokio::net::TcpStream;
@@ -29,7 +24,7 @@ pub fn create_encoder(stream: TcpStream) -> MessageFramed {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
     // Test connection: passing in a stream
     // test Sending: Does it write to the stream
