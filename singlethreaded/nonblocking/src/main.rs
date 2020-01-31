@@ -1,5 +1,6 @@
 // mod seed_node;
 #![warn(rust_2018_idioms)]
+#![recursion_limit="1024"]
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

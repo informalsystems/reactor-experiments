@@ -15,4 +15,4 @@ tokio-serde = { version = "0.6", features = ["bincode", "json"] }
 tokio-util = { version = "0.2", features = ["full"] }
 futures = "0.3"
 futures-util = "0.3"
-futures-await-test = "0.3.0"
+tokio-test = "0.2.0"

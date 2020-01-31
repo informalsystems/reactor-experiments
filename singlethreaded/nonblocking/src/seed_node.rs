@@ -6,6 +6,7 @@ use tokio::sync::mpsc;
 use crate::address_book::{Event as AddressBookEvent, AddressBook, PeerID, Entry};
 use crate::acceptor::{Acceptor, Event as AcceptorEvent};
 use crate::dispatcher::{Dispatcher, Event as DispatcherEvent};
+use tokio_test::block_on;
 
 #[derive(Debug, Clone)]
 enum NodeEvent {
@@ -71,35 +72,38 @@ impl SeedNode {
     // Conversino problem
     // Can we convert a Sender to a different type of sender?
     async fn run(self, mut events_send: mpsc::Sender<Event>, mut events_receive: mpsc::Receiver<Event>) {
+        println!("Starting up node");
         // The ergonomics here can be improved by changing run to a start
         // which runs it's threads and returns the sender
-        let (mut acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(0);
+        let (mut acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(1);
         let acceptor = Acceptor::new(self.entry.clone());
         let acceptor_output_sender = events_send.clone();
         let acceptor_handler = tokio::spawn(async move {
-            acceptor.run(acceptor_output_sender, acceptor_receiver);
+            acceptor.run(acceptor_output_sender, acceptor_receiver).await;
         });
 
-        let (mut dispatcher_sender, dispatcher_receiver) = mpsc::channel::<DispatcherEvent>(0);
+        let (mut dispatcher_sender, dispatcher_receiver) = mpsc::channel::<DispatcherEvent>(1);
         let dispatcher = Dispatcher::new();
         let dispatcher_output_sender = events_send.clone();
         let dispatcher_handler = tokio::spawn(async move {
-            dispatcher.run(dispatcher_output_sender, dispatcher_receiver);
+            dispatcher.run(dispatcher_output_sender, dispatcher_receiver).await;
         });
 
-        let (mut ab_sender, ab_receiver) = mpsc::channel::<AddressBookEvent>(0);
+        let (mut ab_sender, ab_receiver) = mpsc::channel::<AddressBookEvent>(1);
         let address_book = AddressBook::new();
         let ab_output_sender = events_send.clone();
         let ab_handler = tokio::spawn(async move {
-            address_book.run(ab_output_sender, ab_receiver);
+            address_book.run(ab_output_sender, ab_receiver).await;
         });
 
         // The Event translation can be replaced with From trait implementation
         // and the unwraps should bubble up to some kind of reasonable error handling
         while let Some(event) = events_receive.recv().await {
+            println!("Node got an event!");
             match event {
                 Event::Node(node_event) => {
                     if let NodeEvent::Connect(peer_id, entry) = node_event {
+                        println!("Sending connect to acceptor");
                         acceptor_sender.send(AcceptorEvent::Connect(entry)).await;
                     }
                 },
@@ -145,9 +149,11 @@ impl SeedNode {
 mod tests {
     use super::*;
 
-    use futures_await_test::async_test;
-    #[async_test]
-    async fn test_network() {
+    #[test]
+    fn test_network() {
+        use tokio::runtime::Runtime;
+        let mut rt = Runtime::new().unwrap();
+
         let ip_addr = IpAddr::from_str("127.0.0.1").unwrap();
         let node1 = SeedNode::new(Entry::new(
             PeerID::from("1"),
@@ -162,25 +168,29 @@ mod tests {
         ));
 
 
-        let (mut node1_in_send, node1_in_recv) = mpsc::channel::<Event>(0);
-        let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>(0);
-        task::spawn(async move {
-            node1.run(node1_out_send, node1_in_recv);
+        let (mut node1_in_send, node1_in_recv) = mpsc::channel::<Event>(1);
+        let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>(1);
+        rt.spawn(async move {
+            println!("in tokio spawn node");
+            node1.run(node1_out_send, node1_in_recv).await;
+            println!("node running done!");
         });
-        let (node2_in_send, node2_in_recv) = mpsc::channel::<Event>(0);
-        let (node2_out_send, node2_out_recv) = mpsc::channel::<Event>(0);
-        task::spawn(async move {
-            node2.run(node2_out_send, node2_in_recv);
+        let (node2_in_send, node2_in_recv) = mpsc::channel::<Event>(1);
+        let (node2_out_send, node2_out_recv) = mpsc::channel::<Event>(1);
+        rt.spawn(async move {
+            node2.run(node2_out_send, node2_in_recv).await;
         });
 
-        node1_in_send.send(Event::Node(NodeEvent::Connect(PeerID::from("2"), Entry::new(
+        rt.block_on(node1_in_send.send(Event::Node(NodeEvent::Connect(PeerID::from("2"), Entry::new(
                     PeerID::from("2"),
                     ip_addr.clone(),
-                    8903))));
+                    8903)))));
 
         let mut connected:i32 = 0;
         let mut stream = futures::stream::select(node1_out_recv, node2_out_recv);
-        while let Some(event) = stream.next().await {
+
+        while let Some(event) = rt.block_on(stream.next()) {
+            println!("Did something");
             if let Event::Node(NodeEvent::Connected(from_peer_id, to_peer_id)) = event {
                 println!("Peer {} connected to {}", from_peer_id, to_peer_id);
                 //timer.touch = now;

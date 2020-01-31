@@ -1,7 +1,5 @@
 use tokio;
-use futures::{
-    select,
-};
+use futures::select;
 use tokio::sync::mpsc;
 use std::collections::HashMap;
 use futures::prelude::*;
