@@ -46,6 +46,19 @@ pub struct Acceptor {
     entry: Entry,
 }
 
+// TODO: Emit a READY event such that simulations can be synchronized
+
+// Acceptor establishes connections involving a handshake process
+// Acceptor can receive connection from a socket, on connection
+// It will send Hello on the socket
+// In response the Peer is expected to say Hello back
+// On success, emit a Event::PeerConnected(peer_id, stream)
+//
+// Accepor can be Told to establish a connection by received a Event::Connect(entry)
+// On Event::Connect, setup a new stream to a peer
+// on connection, wait for the peer to say hello
+// On Hello, respond with hello
+// emit a Event::PeerConnected(peer_id, stream)
 impl Acceptor {
     pub fn new(entry: Entry) -> Acceptor {
         return Acceptor { entry }
@@ -55,14 +68,12 @@ impl Acceptor {
         let addr = format!("{}:{}", self.entry.ip, self.entry.port);
 
         let mut listener = TcpListener::bind(&addr).await.unwrap();
-        // TODO what we need to do is send a ready Ready event to synchronize the simulation 
-        info!("Node {} acceptor listneing listening on {}", self.entry.id, addr);
+        info!("[{}] listneing listening on {}", self.entry.id, addr);
 
         let mut incoming_iter = listener.incoming();
         loop {
             select! {
                 stream = incoming_iter.next().fuse() => {
-                    // setup the connection
                     let stream = stream.unwrap();
                     match stream {
                         Ok(stream) => {
@@ -72,18 +83,23 @@ impl Acceptor {
                             let mut encoder = encoding::create_encoder(stream);
 
                             tokio::spawn(async move {
-                               let msg = PeerMessage::Hello(my_id);
+                               let msg = PeerMessage::Hello(my_id.clone());
                                encoder
                                     .send(msg)
                                     .await
                                     .unwrap();
 
                                 match encoder.try_next().await {
-                                    Ok(Some(PeerMessage::Hello(peer_id))) => {
-                                        let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
-                                        cb.send(o_event).await.unwrap();
-                                    },
-                                    _ => {
+                                    Ok(msg) => {
+                                        if let Some(PeerMessage::Hello(peer_id)) = msg {
+                                            let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
+                                            cb.send(o_event).await.unwrap();
+                                        } else {
+                                            panic!("received unknown msg type back");
+                                        }
+                                    }
+                                    Err(err) => {
+                                        info!("[{}] error {:?}", my_id, err);
                                         let o_event = EEvent::Acceptor(Event::Error("handshake failed".to_string()));
                                         cb.send(o_event).await.unwrap();
                                     }
@@ -99,17 +115,34 @@ impl Acceptor {
                 },
                 event = rcv_ch.recv().fuse() => {
                     if let Some(Event::Connect(entry)) = event {
-                        info!("acceptor {} received Connect",  self.entry.id);
+                        info!("[{}] received Connect",  self.entry.id);
                         let connect_str = format!("{}:{}", entry.ip, entry.port);
-                        info!("Connecting to: {}", connect_str);
+                        info!("[{}] Connecting to: {}", self.entry.id, connect_str);
+
+                        // Establish the connection and handshake
                         let stream = TcpStream::connect(connect_str).await.unwrap();
                         let mut encoder = encoding::create_encoder(stream);
-                        let oEvent: EEvent = EEvent::Acceptor(Event::PeerConnected(entry.id, encoder));
-                        info!("sent out the event");
-                        if let Ok(()) = send_ch.send(oEvent).await {
-                            info!("channel send succeed");
-                        } else {
-                            panic!("couldn't send on channel, weird");
+
+                        match encoder.try_next().await {
+                            Ok(msg) => {
+                                if let Some(PeerMessage::Hello(peer_id)) = msg {
+                                    info!("[{}] Received Hello from {}",  self.entry.id, peer_id);
+                                    let msg = PeerMessage::Hello(self.entry.id.clone());
+                                    encoder
+                                        .send(msg)
+                                        .await
+                                        .unwrap();
+                                        let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
+                                        send_ch.send(o_event).await.unwrap();
+                                } else {
+                                    panic!("received unknown msg type back");
+                                }
+                            }
+                            Err(err) => {
+                                info!("[{}] error {:?}", self.entry.id, err);
+                                let o_event = EEvent::Acceptor(Event::Error("handshake failed".to_string()));
+                                send_ch.send(o_event).await.unwrap();
+                            }
                         }
                     } else {
                         println!("acceptor rcv_ch closed");

@@ -75,7 +75,7 @@ impl SeedNode {
     // Conversino problem
     // Can we convert a Sender to a different type of sender?
     async fn run(self, mut events_send: mpsc::Sender<Event>, mut events_receive: mpsc::Receiver<Event>) {
-        info!("Node run: {:?}", self.entry);
+        // so events_send, is for the node out
         // The ergonomics here can be improved by changing run to a start
         // which runs it's threads and returns the sender
         let (mut acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(1);
@@ -99,8 +99,7 @@ impl SeedNode {
             address_book.run(ab_output_sender, ab_receiver).await;
         });
 
-        // The Event translation can be replaced with From trait implementation
-        // and the unwraps should bubble up to some kind of reasonable error handling
+        info!("Node run: {:?}", self.entry);
         while let Some(event) = events_receive.recv().await {
             debug!("node: {:?} received: {:?}", self.entry.id, event);
             match event {
@@ -179,7 +178,6 @@ mod tests {
             8903
         ));
 
-
         let (mut node1_in_send, node1_in_recv) = mpsc::channel::<Event>(1);
         let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>(1);
         rt.spawn(async move {
@@ -205,6 +203,10 @@ mod tests {
                 info!("Peer {} connected to {}", from_peer_id, to_peer_id);
                 //timer.touch = now;
                 connected += 1;
+                if connected == 2 {
+                    info!("All peers connected");
+                    return
+                }
             }
         }
     }
