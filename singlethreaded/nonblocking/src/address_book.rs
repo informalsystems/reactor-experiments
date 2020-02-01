@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use tokio::sync::mpsc;
 use serde::{Deserialize, Serialize};
+use log::info;
 
 use crate::seed_node::Event as EEvent;
 
@@ -93,7 +94,7 @@ impl AddressBook {
                 if self.mapping.contains_key(&entry.id) {
                     return Event::NoOp();
                 } else {
-                    println!("Adding peer {:?}", entry);
+                    info!("adding peer {:?}", entry);
                     self.mapping.insert(entry.id.clone(), entry.clone());
                     return Event::PeerAdded(entry.id);
                 }
@@ -118,8 +119,7 @@ impl AddressBook {
                         }
                     },
                     _ => {
-                        // TODO: what about Hello?
-                        println!("miss on from peer");
+                        info!("unprocessed message from peer");
                         return Event::NoOp()
                     },
                 }
@@ -128,8 +128,7 @@ impl AddressBook {
                 return Event::Terminated();
             },
             _ => {
-                println!("Miss on event type");
-                println!("Missed event: {:?}", event);
+                info!("Missed event: {:?}", event);
                 return Event::NoOp();
             },
         }
@@ -138,7 +137,7 @@ impl AddressBook {
     // This can probably be generalized for all runners
     pub async fn run(mut self, send_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
         while let Some(event) = rcv_ch.recv().await {
-            println!("Event loop received {:?}", event);
+            info!("Event loop received {:?}", event);
             self.handle(event);
         }
     }

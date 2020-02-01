@@ -184,12 +184,17 @@ mod tests {
         let (mut node1_in_send, node1_in_recv) = mpsc::channel::<Event>(1);
         let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>(1);
         let node1_in_send2 = node1_in_send.clone();
-        rt.spawn(async move {
-            node1.run(node1_out_send,node1_in_send2, node1_in_recv).await;
-        });
+
         let (node2_in_send, node2_in_recv) = mpsc::channel::<Event>(1);
         let (node2_out_send, node2_out_recv) = mpsc::channel::<Event>(1);
         let node2_in_send2 = node1_in_send.clone();
+
+        // start node 1
+        rt.spawn(async move {
+            node1.run(node1_out_send,node1_in_send2, node1_in_recv).await;
+        });
+
+        // start node 2
         rt.spawn(async move {
             node2.run(node2_out_send, node2_in_send2, node2_in_recv).await;
         });
