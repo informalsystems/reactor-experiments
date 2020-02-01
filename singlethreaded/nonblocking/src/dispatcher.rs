@@ -71,15 +71,15 @@ impl Dispatcher {
                 match event {
                     Event::PeerConnected(peer_id, stream) => {
                         let peer_output = tosend_ch.clone();
-                        let (mut peer_sender, mut peer_receiver) = mpsc::channel::<PeerMessage>(0);
+                        let (mut peer_sender, mut peer_receiver) = mpsc::channel::<PeerMessage>(1);
 
                         let thread_peer_id = peer_id.clone();
                         tokio::spawn(async move {
                             run_peer_thread(thread_peer_id, peer_receiver, peer_output, stream).await;
                         });
 
-                        let index_peer_id = peer_id.clone();
-                        self.peers.insert(peer_id.clone(), peer_sender).unwrap();
+                        // why would this panic?
+                        self.peers.insert(peer_id.clone(), peer_sender);
 
                         let event_peer_id = peer_id.clone();
                         // buah we need an Entry here

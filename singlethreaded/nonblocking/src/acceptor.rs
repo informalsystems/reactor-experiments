@@ -80,9 +80,12 @@ impl Acceptor {
                             let mut cb = send_ch.clone();
                             let my_id = self.entry.id.clone();
 
+                            let peer_addr = stream.peer_addr().unwrap();
+                            info!("[{}] received connection from {}", my_id, peer_addr);
                             let mut encoder = encoding::create_encoder(stream);
 
                             tokio::spawn(async move {
+                               info!("[{}] saying hello to {}", my_id, peer_addr);
                                let msg = PeerMessage::Hello(my_id.clone());
                                encoder
                                     .send(msg)
@@ -92,6 +95,7 @@ impl Acceptor {
                                 match encoder.try_next().await {
                                     Ok(msg) => {
                                         if let Some(PeerMessage::Hello(peer_id)) = msg {
+                                           info!("[{}] received hello from {}", my_id, peer_id);
                                             let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
                                             cb.send(o_event).await.unwrap();
                                         } else {
