@@ -75,7 +75,7 @@ impl Dispatcher {
 
                         let thread_peer_id = peer_id.clone();
                         tokio::spawn(async move {
-                            run_peer_thread(thread_peer_id, peer_receiver, peer_output, stream);
+                            run_peer_thread(thread_peer_id, peer_receiver, peer_output, stream).await;
                         });
 
                         let index_peer_id = peer_id.clone();
@@ -83,13 +83,13 @@ impl Dispatcher {
 
                         let event_peer_id = peer_id.clone();
                         // buah we need an Entry here
-                        tosend_ch.send(Event::AddPeer(peer_id, Entry::default()).into()).await;
+                        tosend_ch.send(Event::AddPeer(peer_id, Entry::default()).into()).await.unwrap();
                     },
                     Event::ToPeer(peer_id, message) => {
                         if let Some(peer) = self.peers.get_mut(&peer_id)  {
-                            peer.send(message).await;
+                            peer.send(message).await.unwrap();
                         } else {
-                            tosend_ch.send(Event::Error(Error::PeerNotFound(peer_id)).into()).await;
+                            tosend_ch.send(Event::Error(Error::PeerNotFound(peer_id)).into()).await.unwrap();
                         }
                     },
                     // TODO: Handle Peer Removal
@@ -115,7 +115,7 @@ async fn run_peer_thread(
         select! {
             msg = encoder.try_next().fuse() => {
                 let msg = msg.unwrap().unwrap(); // This will panic on done, instead we should match
-                received_ch.send(Event::FromPeer(peer_id.clone(), msg).into()).await;
+                received_ch.send(Event::FromPeer(peer_id.clone(), msg).into()).await.unwrap();
             },
             potential_peer_message = tosend_ch.recv().fuse() => {
                 if let Some(message) = potential_peer_message {

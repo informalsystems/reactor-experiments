@@ -7,6 +7,8 @@ use crate::address_book::{Event as AddressBookEvent, AddressBook, PeerID, Entry}
 use crate::acceptor::{Acceptor, Event as AcceptorEvent};
 use crate::dispatcher::{Dispatcher, Event as DispatcherEvent};
 use tokio_test::block_on;
+use log::{debug, error, info};
+
 
 #[derive(Debug, Clone)]
 enum NodeEvent {
@@ -73,7 +75,7 @@ impl SeedNode {
     // Conversino problem
     // Can we convert a Sender to a different type of sender?
     async fn run(self, mut events_send: mpsc::Sender<Event>, mut events_receive: mpsc::Receiver<Event>) {
-        println!("Starting up node");
+        info!("Node run: {:?}", self.entry);
         // The ergonomics here can be improved by changing run to a start
         // which runs it's threads and returns the sender
         let (mut acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(1);
@@ -100,26 +102,29 @@ impl SeedNode {
         // The Event translation can be replaced with From trait implementation
         // and the unwraps should bubble up to some kind of reasonable error handling
         while let Some(event) = events_receive.recv().await {
-            println!("Node got an event!");
+            debug!("node: {:?} received: {:?}", self.entry.id, event);
             match event {
                 Event::Node(node_event) => {
                     if let NodeEvent::Connect(peer_id, entry) = node_event {
-                        println!("Sending connect to acceptor");
-                        acceptor_sender.send(AcceptorEvent::Connect(entry)).await;
+                        let o_event = AcceptorEvent::Connect(entry);
+                        debug!("node: {:?} sending: {:?}", self.entry.id, o_event);
+                        acceptor_sender.send(o_event).await.unwrap();
                     }
                 },
                 Event::Acceptor(acceptor_event) => {
                     if let AcceptorEvent::PeerConnected(peer_id, framed) = acceptor_event {
-                        dispatcher_sender.send(DispatcherEvent::PeerConnected(peer_id, framed)).await;
+                        let o_event = DispatcherEvent::PeerConnected(peer_id, framed);
+                        debug!("node: {:?} sending: {:?}", self.entry.id, o_event);
+                        dispatcher_sender.send(o_event).await.unwrap();
                     }
                 },
                 Event::Dispatcher(dispatcher_event) => {
                     match dispatcher_event {
                         DispatcherEvent::AddPeer(peer_id, entry) => {
-                            ab_sender.send(AddressBookEvent::AddPeer(entry)).await;
+                            ab_sender.send(AddressBookEvent::AddPeer(entry)).await.unwrap();
                         },
                         DispatcherEvent::FromPeer(peer_id, msg) => {
-                            ab_sender.send(AddressBookEvent::FromPeer(peer_id, msg)).await;
+                            ab_sender.send(AddressBookEvent::FromPeer(peer_id, msg)).await.unwrap();
                         },
                         _ => {
                         },
@@ -128,11 +133,11 @@ impl SeedNode {
                 Event::AddressBook(address_book_event) => {
                     match address_book_event {
                         AddressBookEvent::ToPeer(peer_id, msg) => {
-                            dispatcher_sender.send(DispatcherEvent::ToPeer(peer_id, msg)).await;
+                            dispatcher_sender.send(DispatcherEvent::ToPeer(peer_id, msg)).await.unwrap();
                         },
                         AddressBookEvent::PeerAdded(added_peer_id) => {
                             let my_id = self.entry.id.clone();
-                            events_send.send(NodeEvent::Connected(my_id, added_peer_id).into()).await;
+                            events_send.send(NodeEvent::Connected(my_id, added_peer_id).into()).await.unwrap();
                         },
                         _ => {
                         }
@@ -149,9 +154,15 @@ impl SeedNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use simple_logger;
+
+    fn test_setup() {
+        simple_logger::init_with_level(log::Level::Debug).unwrap();
+    }
 
     #[test]
     fn test_network() {
+        test_setup();
         use tokio::runtime::Runtime;
         let mut rt = Runtime::new().unwrap();
 
@@ -172,9 +183,7 @@ mod tests {
         let (mut node1_in_send, node1_in_recv) = mpsc::channel::<Event>(1);
         let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>(1);
         rt.spawn(async move {
-            println!("in tokio spawn node");
             node1.run(node1_out_send, node1_in_recv).await;
-            println!("node running done!");
         });
         let (node2_in_send, node2_in_recv) = mpsc::channel::<Event>(1);
         let (node2_out_send, node2_out_recv) = mpsc::channel::<Event>(1);
@@ -185,15 +194,15 @@ mod tests {
         rt.block_on(node1_in_send.send(Event::Node(NodeEvent::Connect(PeerID::from("2"), Entry::new(
                     PeerID::from("2"),
                     ip_addr.clone(),
-                    8903)))));
+                    8903))))).unwrap();
 
         let mut connected:i32 = 0;
         let mut stream = futures::stream::select(node1_out_recv, node2_out_recv);
 
         while let Some(event) = rt.block_on(stream.next()) {
-            println!("test stream event received: {:?}", event);
+            info!("Test Stream received; {:?}", event);
             if let Event::Node(NodeEvent::Connected(from_peer_id, to_peer_id)) = event {
-                println!("Peer {} connected to {}", from_peer_id, to_peer_id);
+                info!("Peer {} connected to {}", from_peer_id, to_peer_id);
                 //timer.touch = now;
                 connected += 1;
             }

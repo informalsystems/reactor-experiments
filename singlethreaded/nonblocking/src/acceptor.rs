@@ -8,11 +8,13 @@ use std::fmt;
 use crate::encoding;
 use crate::address_book::{PeerMessage, Entry, PeerID};
 use crate::seed_node::Event as EEvent;
+use log::{info};
 
 pub enum Event {
     Connect(Entry),
     FromPeer(PeerID),
-    PeerConnected(PeerID, encoding::MessageFramed)
+    PeerConnected(PeerID, encoding::MessageFramed),
+    Error(String),
 }
 
 impl fmt::Display for Event {
@@ -33,6 +35,9 @@ impl fmt::Debug for Event {
             Event::PeerConnected(peer_id, _) => {
                 return write!(f, "AcceptorEvent::PeerConnected({:?}, Stream)", peer_id);
             },
+            Event::Error(error_str) => {
+                return write!(f, "AcceptorEvent::Error({:?})",error_str);
+            },
         }
     }
 }
@@ -50,7 +55,8 @@ impl Acceptor {
         let addr = format!("{}:{}", self.entry.ip, self.entry.port);
 
         let mut listener = TcpListener::bind(&addr).await.unwrap();
-        println!("Listening on {}", addr);
+        // TODO what we need to do is send a ready Ready event to synchronize the simulation 
+        info!("Node {} acceptor listneing listening on {}", self.entry.id, addr);
 
         let mut incoming_iter = listener.incoming();
         loop {
@@ -66,20 +72,22 @@ impl Acceptor {
                             let mut encoder = encoding::create_encoder(stream);
 
                             tokio::spawn(async move {
-                                // First we say hello
                                let msg = PeerMessage::Hello(my_id);
                                encoder
                                     .send(msg)
                                     .await
                                     .unwrap();
 
-                                // XXX: Peer disconnected
-                                if let Some(msg) = encoder.try_next().await.unwrap() {
-                                    if let PeerMessage::Hello(peer_id) = msg {
-                                        let oEvent: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
-                                        cb.send(oEvent).await.unwrap();
+                                match encoder.try_next().await {
+                                    Ok(Some(PeerMessage::Hello(peer_id))) => {
+                                        let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
+                                        cb.send(o_event).await.unwrap();
+                                    },
+                                    _ => {
+                                        let o_event = EEvent::Acceptor(Event::Error("handshake failed".to_string()));
+                                        cb.send(o_event).await.unwrap();
                                     }
-                                };
+                                }
                             });
                         },
                         Err(err) => {
@@ -90,16 +98,16 @@ impl Acceptor {
 
                 },
                 event = rcv_ch.recv().fuse() => {
-                    println!("accepted received event");
                     if let Some(Event::Connect(entry)) = event {
+                        info!("acceptor {} received Connect",  self.entry.id);
                         let connect_str = format!("{}:{}", entry.ip, entry.port);
-                        println!("Connecting to: {}", connect_str);
+                        info!("Connecting to: {}", connect_str);
                         let stream = TcpStream::connect(connect_str).await.unwrap();
                         let mut encoder = encoding::create_encoder(stream);
                         let oEvent: EEvent = EEvent::Acceptor(Event::PeerConnected(entry.id, encoder));
-                        println!("sent out the event");
+                        info!("sent out the event");
                         if let Ok(()) = send_ch.send(oEvent).await {
-                            println!("channel send succeed");
+                            info!("channel send succeed");
                         } else {
                             panic!("couldn't send on channel, weird");
                         }
