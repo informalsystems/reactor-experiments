@@ -1,7 +1,7 @@
 use tokio;
 use futures::select;
 use futures::prelude::*;
-use tokio::net::TcpListener;
+use tokio::net::{TcpStream, TcpListener};
 use tokio::sync::mpsc;
 
 use crate::encoding;
@@ -23,7 +23,7 @@ impl Acceptor {
         return Acceptor { entry }
     }
 
-    pub async fn run(self, send_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
+    pub async fn run(self, mut send_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
         let addr = format!("{}:{}", self.entry.ip, self.entry.port);
 
         let mut listener = TcpListener::bind(&addr).await.unwrap();
@@ -35,7 +35,6 @@ impl Acceptor {
                 stream = incoming_iter.next().fuse() => {
                     // setup the connection
                     let stream = stream.unwrap();
-                    /*
                     match stream {
                         Ok(stream) => {
                             let mut cb = send_ch.clone();
@@ -51,6 +50,7 @@ impl Acceptor {
                                     .await
                                     .unwrap();
 
+                                // XXX: Peer disconnected
                                 if let Some(msg) = encoder.try_next().await.unwrap() {
                                     if let PeerMessage::Hello(peer_id) = msg {
                                         let oEvent: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
@@ -64,15 +64,22 @@ impl Acceptor {
                             return
                         },
                     }
-                    */
 
                 },
                 event = rcv_ch.recv().fuse() => {
                     println!("accepted received event");
                     if let Some(Event::Connect(entry)) = event {
-                        println!("Dialing into a peer!");
-                        // I should be able to dial in
-                        // dial a peer and handshake
+                        let connect_str = format!("{}:{}", entry.ip, entry.port);
+                        println!("Connecting to: {}", connect_str);
+                        let stream = TcpStream::connect(connect_str).await.unwrap();
+                        let mut encoder = encoding::create_encoder(stream);
+                        let oEvent: EEvent = EEvent::Acceptor(Event::PeerConnected(entry.id, encoder));
+                        println!("sent out the event");
+                        if let Ok(()) = send_ch.send(oEvent).await {
+                            println!("channel send succeed");
+                        } else {
+                            panic!("couldn't send on channel, weird");
+                        }
                     } else {
                         println!("acceptor rcv_ch closed");
                         return

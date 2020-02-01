@@ -190,7 +190,7 @@ mod tests {
         let mut stream = futures::stream::select(node1_out_recv, node2_out_recv);
 
         while let Some(event) = rt.block_on(stream.next()) {
-            println!("Did something");
+            println!("Test stream received an event");
             if let Event::Node(NodeEvent::Connected(from_peer_id, to_peer_id)) = event {
                 println!("Peer {} connected to {}", from_peer_id, to_peer_id);
                 //timer.touch = now;
