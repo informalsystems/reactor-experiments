@@ -3,6 +3,7 @@ use futures::select;
 use futures::prelude::*;
 use tokio::net::{TcpStream, TcpListener};
 use tokio::sync::mpsc;
+use std::fmt;
 
 use crate::encoding;
 use crate::address_book::{PeerMessage, Entry, PeerID};
@@ -12,6 +13,28 @@ pub enum Event {
     Connect(Entry),
     FromPeer(PeerID),
     PeerConnected(PeerID, encoding::MessageFramed)
+}
+
+impl fmt::Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AcceptorEvent display")
+    }
+}
+
+impl fmt::Debug for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Event::Connect(entry) => {
+                return write!(f, "AcceptorEvent::Connect({:?})", entry);
+            },
+            Event::FromPeer(peer_id) => {
+                return write!(f, "AcceptorEvent::FromPeer({:?})", peer_id);
+            },
+            Event::PeerConnected(peer_id, _) => {
+                return write!(f, "AcceptorEvent::PeerConnected({:?}, Stream)", peer_id);
+            },
+        }
+    }
 }
 
 pub struct Acceptor {
@@ -54,7 +77,7 @@ impl Acceptor {
                                 if let Some(msg) = encoder.try_next().await.unwrap() {
                                     if let PeerMessage::Hello(peer_id) = msg {
                                         let oEvent: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
-                                        cb.send(oEvent).await;
+                                        cb.send(oEvent).await.unwrap();
                                     }
                                 };
                             });

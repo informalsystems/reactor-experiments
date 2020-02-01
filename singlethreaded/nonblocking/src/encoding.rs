@@ -6,8 +6,8 @@ use crate::address_book::{PeerMessage};
 
 type TcpFrame = Framed<TcpStream, LengthDelimitedCodec>;
 // XXX: maybe rename to PeerMessageFramed
+//
 pub type MessageFramed = SymmetricallyFramed<TcpFrame, PeerMessage, SymmetricalJson<PeerMessage>>;
-
 
 pub fn create_encoder(stream: TcpStream) -> MessageFramed {
     let tcp_frame = TcpFrame::new(
