@@ -78,12 +78,14 @@ impl Entry {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AddressBook {
+    id: PeerID,
     mapping: HashMap<PeerID, Entry>,
 }
 
 impl AddressBook {
-    pub fn new() -> AddressBook {
+    pub fn new(peer_id: PeerID) -> AddressBook {
         return AddressBook {
+            id: peer_id,
             mapping: HashMap::new(),
         }
     }
@@ -94,7 +96,7 @@ impl AddressBook {
                 if self.mapping.contains_key(&entry.id) {
                     return Event::NoOp();
                 } else {
-                    info!("adding peer {:?}", entry);
+                    info!("[{}] adding peer {:?}", self.id, entry);
                     self.mapping.insert(entry.id.clone(), entry.clone());
                     return Event::PeerAdded(entry.id);
                 }
@@ -137,7 +139,6 @@ impl AddressBook {
     // This can probably be generalized for all runners
     pub async fn run(mut self, send_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
         while let Some(event) = rcv_ch.recv().await {
-            info!("Event loop received {:?}", event);
             self.handle(event);
         }
     }
@@ -148,6 +149,7 @@ impl From<Entries> for AddressBook {
     fn from(entries: Entries) -> Self {
         let mapping: HashMap<PeerID, Entry> = entries.iter().cloned().collect();
         return AddressBook {
+            id: PeerID::from(""),
             mapping,
         }
     }
@@ -165,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_fsm() {
-        let mut address_book = AddressBook::new();
+        let mut address_book = AddressBook::new(PeerID::from(""));
 
         let id = PeerID::from("2");
         let ip_addr = IpAddr::from_str("127.0.0.1").unwrap();
@@ -187,8 +189,6 @@ mod tests {
 
             // System triggers a polling operation
             (Event::PollTrigger(), Event::PollPeers(vec![PeerID::from("2")])),
-
-            // p2p layer will take PollPeer event and generate requests...
 
             // Peer:2 responds with an address Book containing peer 3
             (Event::FromPeer(PeerID::from("2"),  PeerMessage::AddressBookResponse(peer_2_mapping)),

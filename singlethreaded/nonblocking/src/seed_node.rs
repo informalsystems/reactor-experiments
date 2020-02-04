@@ -1,3 +1,26 @@
+/// We want to develop a non-blocking version of the peer exchange protocol.
+/// The peer exchange protocol or PEX is a protocol in which peers accumulated an address book of
+/// other peers through a gossip process. Peers will periodically poll peers in it's owned address
+/// book in order to discover what other peers are avaiable in the network.
+///
+/// Non blocking in this case means that no activity being performed by one peer will impede or
+/// block the operations of another peer.
+///
+/// In addition to functional requirements, inline with the experimental framework outlined in
+/// https://github.com/interchainio/reactor-experiments/blob/master/.plaintext/README.md, we would
+/// like to explore specific architectural constraints.
+///
+/// 1. Seperation of concerns into components
+///     1.1 Each component exists as it's own Finite state machine
+///         1.1.2 State mutation is serialized and driven by events
+///     1.2 Each components is encapsulated and has no knowledge of any other component
+/// 2. Components are composable.
+///     2.1 Components can coordinate by intra-component coordination, driven exclusively by events
+/// 3. Component composition is done centrally in a routing table
+///
+/// The goal of these constraints is to explore the ergonomics of code which can
+/// A. Be simulated deterministically
+/// B. Trace the path of simulated events through the components
 use futures::prelude::*;
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -87,14 +110,14 @@ impl SeedNode {
         });
 
         let (mut dispatcher_sender, dispatcher_receiver) = mpsc::channel::<DispatcherEvent>(1);
-        let dispatcher = Dispatcher::new();
+        let dispatcher = Dispatcher::new(self.entry.id.clone());
         let dispatcher_output_sender = events_in_send.clone();
         let dispatcher_handler = tokio::spawn(async move {
             dispatcher.run(dispatcher_output_sender, dispatcher_receiver).await;
         });
 
         let (mut ab_sender, ab_receiver) = mpsc::channel::<AddressBookEvent>(1);
-        let address_book = AddressBook::new();
+        let address_book = AddressBook::new(self.entry.id.clone());
         let ab_output_sender = events_in_send.clone();
         let ab_handler = tokio::spawn(async move {
             address_book.run(ab_output_sender, ab_receiver).await;
@@ -107,14 +130,12 @@ impl SeedNode {
                 Event::Node(node_event) => {
                     if let NodeEvent::Connect(peer_id, entry) = node_event {
                         let o_event = AcceptorEvent::Connect(entry);
-                        info!("[{}] sending: {:?}", self.entry.id, o_event);
                         acceptor_sender.send(o_event).await.unwrap();
                     }
                 },
                 Event::Acceptor(acceptor_event) => {
-                    if let AcceptorEvent::PeerConnected(peer_id, framed) = acceptor_event {
-                        let o_event = DispatcherEvent::PeerConnected(peer_id, framed);
-                        info!("[{}] sending: {:?}", self.entry.id, o_event);
+                    if let AcceptorEvent::PeerConnected(entry, framed) = acceptor_event {
+                        let o_event = DispatcherEvent::PeerConnected(entry, framed);
                         dispatcher_sender.send(o_event).await.unwrap();
                     }
                 },

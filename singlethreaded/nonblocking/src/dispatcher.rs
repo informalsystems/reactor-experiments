@@ -4,13 +4,14 @@ use tokio::sync::mpsc;
 use std::collections::HashMap;
 use futures::prelude::*;
 use std::fmt;
+use log::info;
 
 use crate::address_book::{PeerMessage, PeerID, Entry};
 use crate::encoding;
 use crate::seed_node::Event as EEvent;
 
 pub enum Event {
-    PeerConnected(PeerID, encoding::MessageFramed),
+    PeerConnected(Entry, encoding::MessageFramed),
     AddPeer(PeerID, Entry),
 
     FromPeer(PeerID, PeerMessage),
@@ -53,13 +54,15 @@ pub enum Error {
 }
 
 pub struct Dispatcher {
+    id: PeerID,
     peers: HashMap<PeerID, mpsc::Sender<PeerMessage>>,
 }
 
 //  The input is is every peers socket + the 
 impl Dispatcher {
-    pub fn new() -> Dispatcher {
+    pub fn new(peer_id: PeerID) -> Dispatcher {
         Dispatcher {
+            id: peer_id,
             peers: HashMap::<PeerID, mpsc::Sender<PeerMessage>>::new(),
         }
     }
@@ -67,23 +70,22 @@ impl Dispatcher {
     pub async fn run(mut self, mut tosend_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
         loop {
             if let Some(event) = rcv_ch.recv().await {
-                // XXX: extrat this into a hande function
+                info!("[{}] received event {:?}", self.id, event);
                 match event {
-                    Event::PeerConnected(peer_id, stream) => {
+                    Event::PeerConnected(entry, stream) => {
                         let peer_output = tosend_ch.clone();
                         let (mut peer_sender, mut peer_receiver) = mpsc::channel::<PeerMessage>(1);
 
-                        let thread_peer_id = peer_id.clone();
+                        let thread_peer_id = entry.id.clone();
                         tokio::spawn(async move {
                             run_peer_thread(thread_peer_id, peer_receiver, peer_output, stream).await;
                         });
 
                         // why would this panic?
-                        self.peers.insert(peer_id.clone(), peer_sender);
+                        self.peers.insert(entry.id.clone(), peer_sender);
 
-                        let event_peer_id = peer_id.clone();
-                        // buah we need an Entry here
-                        tosend_ch.send(Event::AddPeer(peer_id, Entry::default()).into()).await.unwrap();
+                        let event_peer_id = entry.id.clone();
+                        tosend_ch.send(Event::AddPeer(event_peer_id, entry).into()).await.unwrap();
                     },
                     Event::ToPeer(peer_id, message) => {
                         if let Some(peer) = self.peers.get_mut(&peer_id)  {
@@ -114,8 +116,12 @@ async fn run_peer_thread(
     loop {
         select! {
             msg = encoder.try_next().fuse() => {
-                let msg = msg.unwrap().unwrap(); // This will panic on done, instead we should match
-                received_ch.send(Event::FromPeer(peer_id.clone(), msg).into()).await.unwrap();
+                if let Some(msg) = msg.unwrap() {
+                    received_ch.send(Event::FromPeer(peer_id.clone(), msg).into()).await.unwrap();
+                } else {
+                    info!("dispatcher {} thread done", peer_id);
+                    return
+                }
             },
             potential_peer_message = tosend_ch.recv().fuse() => {
                 if let Some(message) = potential_peer_message {

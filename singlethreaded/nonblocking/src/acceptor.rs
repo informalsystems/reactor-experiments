@@ -12,8 +12,7 @@ use log::{info};
 
 pub enum Event {
     Connect(Entry),
-    FromPeer(PeerID),
-    PeerConnected(PeerID, encoding::MessageFramed),
+    PeerConnected(Entry, encoding::MessageFramed),
     Error(String),
 }
 
@@ -29,11 +28,8 @@ impl fmt::Debug for Event {
             Event::Connect(entry) => {
                 return write!(f, "AcceptorEvent::Connect({:?})", entry);
             },
-            Event::FromPeer(peer_id) => {
-                return write!(f, "AcceptorEvent::FromPeer({:?})", peer_id);
-            },
-            Event::PeerConnected(peer_id, _) => {
-                return write!(f, "AcceptorEvent::PeerConnected({:?}, Stream)", peer_id);
+            Event::PeerConnected(entry, _) => {
+                return write!(f, "AcceptorEvent::PeerConnected({:?}, Stream)", entry.id);
             },
             Event::Error(error_str) => {
                 return write!(f, "AcceptorEvent::Error({:?})",error_str);
@@ -96,8 +92,10 @@ impl Acceptor {
                                     Ok(msg) => {
                                         if let Some(PeerMessage::Hello(peer_id)) = msg {
                                            info!("[{}] received hello from {}", my_id, peer_id);
-                                            let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
-                                            cb.send(o_event).await.unwrap();
+                                           // this need an entry
+                                           let entry = Entry::new(my_id.clone(), peer_addr.ip(), peer_addr.port());
+                                           let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(entry, encoder));
+                                           cb.send(o_event).await.unwrap();
                                         } else {
                                             panic!("received unknown msg type back");
                                         }
@@ -125,6 +123,7 @@ impl Acceptor {
 
                         // Establish the connection and handshake
                         let stream = TcpStream::connect(connect_str).await.unwrap();
+                        let peer_addr = stream.peer_addr().unwrap();
                         let mut encoder = encoding::create_encoder(stream);
 
                         match encoder.try_next().await {
@@ -136,7 +135,8 @@ impl Acceptor {
                                         .send(msg)
                                         .await
                                         .unwrap();
-                                        let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(peer_id, encoder));
+                                        let entry = Entry::new(peer_id.clone(), peer_addr.ip(), peer_addr.port());
+                                        let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(entry, encoder));
                                         send_ch.send(o_event).await.unwrap();
                                 } else {
                                     panic!("received unknown msg type back");
