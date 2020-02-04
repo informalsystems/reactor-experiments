@@ -77,8 +77,9 @@ impl Dispatcher {
                         let (mut peer_sender, mut peer_receiver) = mpsc::channel::<PeerMessage>(1);
 
                         let thread_peer_id = entry.id.clone();
+                        let my_id = self.id.clone();
                         tokio::spawn(async move {
-                            run_peer_thread(thread_peer_id, peer_receiver, peer_output, stream).await;
+                            run_peer_thread(my_id, thread_peer_id, peer_receiver, peer_output, stream).await;
                         });
 
                         // why would this panic?
@@ -100,7 +101,7 @@ impl Dispatcher {
                     },
                 }
             } else {
-                println!("Closing dipatcher");
+                info!("[{}] Closing dipatcher", self.id);
                 break;
             }
         }
@@ -108,6 +109,7 @@ impl Dispatcher {
 }
 
 async fn run_peer_thread(
+    my_id: PeerID,
     peer_id: PeerID,
     mut tosend_ch: mpsc::Receiver<PeerMessage>, // Events to write to socket
     mut received_ch: mpsc::Sender<EEvent>, // Events received from the socket and sent downstream
@@ -115,18 +117,23 @@ async fn run_peer_thread(
 
     loop {
         select! {
-            msg = encoder.try_next().fuse() => {
-                if let Some(msg) = msg.unwrap() {
+            msg = encoder.next().fuse() => {
+                // Here we are receiving Ok(None) From the Peer
+                info!("[{}] peer thread {} received {:?}", my_id, peer_id, msg);
+                if let Some(Ok(msg)) = msg {
                     received_ch.send(Event::FromPeer(peer_id.clone(), msg).into()).await.unwrap();
                 } else {
-                    info!("dispatcher {} thread done", peer_id);
+                    info!("[{}] dispatcher {} thread done", my_id, peer_id);
                     return
                 }
             },
             potential_peer_message = tosend_ch.recv().fuse() => {
                 if let Some(message) = potential_peer_message {
+                    info!("[{}] Sending message {:?}", my_id, message);
                     // TODO: serialize and write to socket
                 } else {
+                    // XXX: why is this being closed?
+                    info!("[{}] sender {} tosend_ch done", my_id, peer_id);
                     break;
                 }
             },

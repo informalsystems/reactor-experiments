@@ -157,6 +157,7 @@ impl SeedNode {
                             dispatcher_sender.send(DispatcherEvent::ToPeer(peer_id, msg)).await.unwrap();
                         },
                         AddressBookEvent::PeerAdded(added_peer_id) => {
+                            info!("emitting peer connected");
                             let my_id = self.entry.id.clone();
                             events_out_send.send(NodeEvent::Connected(my_id, added_peer_id).into()).await.unwrap();
                         },

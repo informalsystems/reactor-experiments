@@ -93,7 +93,7 @@ impl Acceptor {
                                         if let Some(PeerMessage::Hello(peer_id)) = msg {
                                            info!("[{}] received hello from {}", my_id, peer_id);
                                            // this need an entry
-                                           let entry = Entry::new(my_id.clone(), peer_addr.ip(), peer_addr.port());
+                                           let entry = Entry::new(peer_id, peer_addr.ip(), peer_addr.port());
                                            let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(entry, encoder));
                                            cb.send(o_event).await.unwrap();
                                         } else {

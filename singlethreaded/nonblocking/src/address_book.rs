@@ -137,9 +137,9 @@ impl AddressBook {
     }
 
     // This can probably be generalized for all runners
-    pub async fn run(mut self, send_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
+    pub async fn run(mut self, mut send_ch: mpsc::Sender<EEvent>, mut rcv_ch: mpsc::Receiver<Event>) {
         while let Some(event) = rcv_ch.recv().await {
-            self.handle(event);
+            send_ch.send(self.handle(event).into()).await.unwrap();
         }
     }
 }
