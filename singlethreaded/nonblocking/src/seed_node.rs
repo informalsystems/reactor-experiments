@@ -24,6 +24,7 @@
 use futures::prelude::*;
 use std::net::IpAddr;
 use std::str::FromStr;
+use std::collections::HashMap;
 use tokio::sync::mpsc;
 use crate::address_book::{Event as AddressBookEvent, AddressBook, PeerID, Entry};
 use crate::acceptor::{Acceptor, Event as AcceptorEvent};
@@ -33,7 +34,8 @@ use log::{info};
 #[derive(Hash, PartialEq, Eq, Debug, Clone)]
 enum NodeEvent {
     Connect(PeerID, Entry),
-    Connected(PeerID, PeerID) // when one peer connects to another
+    Connected(PeerID, PeerID), // when one peer connects to another
+    Test(),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -96,7 +98,7 @@ impl SeedNode {
     // Can we convert a Sender to a different type of sender?
     async fn run(self,
         mut events_out_send: mpsc::Sender<Event>,
-        mut events_in_send: mpsc::Sender<Event>,
+        events_in_send: mpsc::Sender<Event>,
         mut events_receive: mpsc::Receiver<Event>) {
         // The ergonomics here can be improved by changing run to a start
         // and then returning the channels needed for interaction
@@ -163,9 +165,6 @@ impl SeedNode {
                         }
                     }
                 },
-                _ => {
-                    // hmm?
-                }
             }
         }
     }
@@ -227,8 +226,16 @@ mod tests {
         let mut connected:i32 = 0;
         let mut stream = futures::stream::select(node1_out_recv, node2_out_recv);
 
+        let mut script = HashMap::new();
+        script.insert(
+            Event::Node(NodeEvent::Connected(PeerID::from("1"), PeerID::from("2"))),
+            Event::Node(NodeEvent::Test()));
+
         while let Some(event) = rt.block_on(stream.next()) {
             info!("Test Stream received; {:?}", event);
+            if let Some(response) = script.get(&event) {
+                info!("Test triggered sending {:?}", response);
+            }
             if let Event::Node(NodeEvent::Connected(from_peer_id, to_peer_id)) = event {
                 info!("Peer {} connected to {}", from_peer_id, to_peer_id);
                 //timer.touch = now;
@@ -238,6 +245,7 @@ mod tests {
                     return
                 }
             }
+
         }
     }
 }

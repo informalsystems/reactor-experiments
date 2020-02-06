@@ -47,7 +47,7 @@ impl Dispatcher {
                 match event {
                     Event::PeerConnected(entry, stream) => {
                         let peer_output = tosend_ch.clone();
-                        let (mut peer_sender, mut peer_receiver) = mpsc::channel::<PeerMessage>(1);
+                        let (peer_sender, peer_receiver) = mpsc::channel::<PeerMessage>(1);
 
                         let thread_peer_id = entry.id.clone();
                         let my_id = self.id.clone();
@@ -86,7 +86,7 @@ async fn run_peer_thread(
     peer_id: PeerID,
     mut tosend_ch: mpsc::Receiver<PeerMessage>, // Events to write to socket
     mut received_ch: mpsc::Sender<EEvent>, // Events received from the socket and sent downstream
-    mut stream: Stream) { // socket to read and write to
+    stream: Stream) { // socket to read and write to
 
     let mut encoder = stream.get_framed();
     loop {
@@ -112,17 +112,5 @@ async fn run_peer_thread(
                 }
             },
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    // use super::*;
-
-    // Test connection: passing in a stream
-    // test Sending: Does it write to the stream
-    // Test Reading: does it receive the message on the other side
-    #[test]
-    fn test_basic_peer_interaction() {
     }
 }

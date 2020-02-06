@@ -8,10 +8,6 @@ use std::hash::{Hash, Hasher};
 
 use crate::seed_node::Event as EEvent;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Error {
-    PeerNotFound(),
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Event {
@@ -27,8 +23,6 @@ pub enum Event {
 
     Terminate(),
     Terminated(),
-
-    Error(Error),
 
     NoOp(),
     Modified(),
@@ -64,14 +58,6 @@ impl Entry {
             id: id,
             ip: ip,
             port: port,
-        }
-    }
-
-    pub fn default() -> Entry {
-        return Entry {
-            id: "".to_string(),
-            ip: IpAddr::from_str("127.0.0.1").unwrap(),
-            port: 0,
         }
     }
 }
