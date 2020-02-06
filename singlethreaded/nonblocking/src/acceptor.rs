@@ -3,39 +3,17 @@ use futures::select;
 use futures::prelude::*;
 use tokio::net::{TcpStream, TcpListener};
 use tokio::sync::mpsc;
-use std::fmt;
 
-use crate::encoding;
-use crate::address_book::{PeerMessage, Entry, PeerID};
+use crate::encoding::Stream;
+use crate::address_book::{PeerMessage, Entry};
 use crate::seed_node::Event as EEvent;
 use log::{info};
 
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Event {
     Connect(Entry),
-    PeerConnected(Entry, encoding::MessageFramed),
+    PeerConnected(Entry, Stream),
     Error(String),
-}
-
-impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AcceptorEvent display")
-    }
-}
-
-impl fmt::Debug for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Event::Connect(entry) => {
-                return write!(f, "AcceptorEvent::Connect({:?})", entry);
-            },
-            Event::PeerConnected(entry, _) => {
-                return write!(f, "AcceptorEvent::PeerConnected({:?}, Stream)", entry.id);
-            },
-            Event::Error(error_str) => {
-                return write!(f, "AcceptorEvent::Error({:?})",error_str);
-            },
-        }
-    }
 }
 
 pub struct Acceptor {
@@ -78,7 +56,7 @@ impl Acceptor {
 
                             let peer_addr = stream.peer_addr().unwrap();
                             info!("[{}] received connection from {}", my_id, peer_addr);
-                            let mut encoder = encoding::create_encoder(stream);
+                            let mut encoder = Stream::new(stream).get_framed();
 
                             tokio::spawn(async move {
                                info!("[{}] saying hello to {}", my_id, peer_addr);
@@ -94,7 +72,8 @@ impl Acceptor {
                                            info!("[{}] received hello from {}", my_id, peer_id);
                                            // this need an entry
                                            let entry = Entry::new(peer_id, peer_addr.ip(), peer_addr.port());
-                                           let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(entry, encoder));
+                                           let new_stream = Stream::from_framed(encoder);
+                                           let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(entry, new_stream));
                                            cb.send(o_event).await.unwrap();
                                         } else {
                                             panic!("received unknown msg type back");
@@ -124,7 +103,7 @@ impl Acceptor {
                         // Establish the connection and handshake
                         let stream = TcpStream::connect(connect_str).await.unwrap();
                         let peer_addr = stream.peer_addr().unwrap();
-                        let mut encoder = encoding::create_encoder(stream);
+                        let mut encoder = Stream::new(stream).get_framed();
 
                         match encoder.try_next().await {
                             Ok(msg) => {
@@ -136,7 +115,8 @@ impl Acceptor {
                                         .await
                                         .unwrap();
                                         let entry = Entry::new(peer_id.clone(), peer_addr.ip(), peer_addr.port());
-                                        let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(entry, encoder));
+                                        let new_stream = Stream::from_framed(encoder);
+                                        let o_event: EEvent = EEvent::Acceptor(Event::PeerConnected(entry, new_stream));
                                         send_ch.send(o_event).await.unwrap();
                                 } else {
                                     panic!("received unknown msg type back");

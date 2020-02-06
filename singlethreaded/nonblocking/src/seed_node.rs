@@ -24,21 +24,19 @@
 use futures::prelude::*;
 use std::net::IpAddr;
 use std::str::FromStr;
-use tokio::task;
 use tokio::sync::mpsc;
 use crate::address_book::{Event as AddressBookEvent, AddressBook, PeerID, Entry};
 use crate::acceptor::{Acceptor, Event as AcceptorEvent};
 use crate::dispatcher::{Dispatcher, Event as DispatcherEvent};
-use tokio_test::block_on;
-use log::{debug, error, info};
+use log::{info};
 
-#[derive(Debug, Clone)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
 enum NodeEvent {
     Connect(PeerID, Entry),
     Connected(PeerID, PeerID) // when one peer connects to another
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Event {
     Node(NodeEvent),
     AddressBook(AddressBookEvent),
@@ -134,8 +132,8 @@ impl SeedNode {
                     }
                 },
                 Event::Acceptor(acceptor_event) => {
-                    if let AcceptorEvent::PeerConnected(entry, framed) = acceptor_event {
-                        let o_event = DispatcherEvent::PeerConnected(entry, framed);
+                    if let AcceptorEvent::PeerConnected(entry, stream) = acceptor_event {
+                        let o_event = DispatcherEvent::PeerConnected(entry, stream);
                         dispatcher_sender.send(o_event).await.unwrap();
                     }
                 },

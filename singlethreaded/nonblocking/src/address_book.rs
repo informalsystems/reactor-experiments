@@ -4,15 +4,16 @@ use std::str::FromStr;
 use tokio::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use log::info;
+use std::hash::{Hash, Hasher};
 
 use crate::seed_node::Event as EEvent;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Error {
     PeerNotFound(),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Event {
     AddPeer(Entry),
     // RemovePeer
@@ -33,20 +34,21 @@ pub enum Event {
     Modified(),
 }
 
+// We need to make this an actual type
 type Mapping = HashMap<PeerID, Entry>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Hash, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PeerMessage {
     Hello(PeerID),
     AddressBookRequest(),
-    AddressBookResponse(Mapping),
+    AddressBookResponse(AddressBook),
 }
 
 pub type PeerID = String;
 pub type PeerList = Vec<PeerID>;
 
 /// The address of a peer in the network.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Entry {
     /// The cryptographic address of this peer.
     pub id: PeerID,
@@ -74,12 +76,18 @@ impl Entry {
     }
 }
 
-// Events
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AddressBook {
     id: PeerID,
     mapping: HashMap<PeerID, Entry>,
+}
+
+// XXX: use a stupid hash which will cause collisions
+impl Hash for AddressBook {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // XXX: Dummy
+        "foobar".to_string().hash(state);
+    }
 }
 
 impl AddressBook {
@@ -109,14 +117,14 @@ impl AddressBook {
             Event::FromPeer(peer_id, message) => {
                 match message {
                     PeerMessage::AddressBookRequest() => {
-                       let message = PeerMessage::AddressBookResponse(self.mapping.clone());
+                       let message = PeerMessage::AddressBookResponse(self.clone());
                        return Event::ToPeer(peer_id, message);
                     },
-                    PeerMessage::AddressBookResponse(mapping) => {
-                        if mapping == self.mapping {
+                    PeerMessage::AddressBookResponse(other) => {
+                        if self.mapping == other.mapping {
                             return Event::NoOp();
                         } else {
-                            self.mapping.extend(mapping);
+                            self.mapping.extend(other.mapping);
                             return Event::Modified(); // XXX: Produce diff
                         }
                     },
@@ -167,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_fsm() {
-        let mut address_book = AddressBook::new(PeerID::from(""));
+        let mut address_book = AddressBook::new(PeerID::from("2"));
 
         let id = PeerID::from("2");
         let ip_addr = IpAddr::from_str("127.0.0.1").unwrap();
@@ -177,6 +185,20 @@ mod tests {
         let peer_3_entry = Entry::new(PeerID::from("3"), ip_addr.clone(), port);
 
         let peer_2_mapping: Mapping = [(PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect();
+        let address_book_2 = AddressBook {
+            id: PeerID::from("2"),
+            mapping: peer_2_mapping,
+        };
+
+        let mapping_1 = [
+            (PeerID::from("2"), peer_2_entry.clone()),
+            (PeerID::from("3"), peer_3_entry.clone())
+        ].iter().cloned().collect();
+        let address_book_1 = AddressBook {
+            id: PeerID::from("2"),
+            mapping: mapping_1,
+        };
+
 
         let sequence = vec![
             // System adds peer
@@ -191,14 +213,12 @@ mod tests {
             (Event::PollTrigger(), Event::PollPeers(vec![PeerID::from("2")])),
 
             // Peer:2 responds with an address Book containing peer 3
-            (Event::FromPeer(PeerID::from("2"),  PeerMessage::AddressBookResponse(peer_2_mapping)),
+            (Event::FromPeer(PeerID::from("2"),  PeerMessage::AddressBookResponse(address_book_2)),
                 Event::Modified()),
 
             // peer 2 then asks peer:1 for address book which contains peer 3
             (Event::FromPeer(PeerID::from("2"), PeerMessage::AddressBookRequest()),
-                Event::ToPeer(id.clone(), PeerMessage::AddressBookResponse(
-                    [(PeerID::from("2"), peer_2_entry.clone()),
-                    (PeerID::from("3"), peer_3_entry.clone())].iter().cloned().collect()))),
+                Event::ToPeer(id.clone(), PeerMessage::AddressBookResponse(address_book_1)))
         ];
 
         for (input, expected_output) in sequence.into_iter() {
