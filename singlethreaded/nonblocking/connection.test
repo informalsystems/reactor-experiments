@@ -1,0 +1,89 @@
+// What do we need here?
+// We need to maintain connections to peers
+// connections can be inccoming, via listen
+//  Listen
+// connection can be ongoing, via dial
+//  Dialing requires sending a Hello Message (establish ID)
+// Both types of connections should be kept in a 
+use crate::types::{Event, PeerID};
+
+// Facilitate message transmission to/from a peer
+// Should we try and start/stop or just allow drop?
+pub struct RemotePeer {
+}
+
+impl RemotePeer {
+    fn new() -> RemotePeer {
+    }
+}
+
+pub struct ConnectionManager {
+    connections: HashMap<PeerID, RemotePeer>
+}
+
+impl ConnectionManager {
+    fn new() -> ConnectionManager {
+    }
+
+    // In terms of api we need:
+    // * To run this in it's own thread
+    // * To Connect peers from a seperate thread
+    // * To Disconnect peers from a seperate thread
+    fn connect_peer(&mut self, peerID: PeerID, info: peerAddr) {
+    }
+
+    fn disconnect_peer(&mut self, peerID: PeerID) {
+    }
+
+    fn run(&mut self, send_ch: crossbeam::Sender<Event>) {
+        let addr = "127.0.0.1:8080".to_string();
+
+        let mut listener = TcpListener::bind(&addr).await?; // or error
+        println!("Listening on {}", addr);
+
+        // Launch a listener thread
+        // This thread should listen on a channel from the serialize write to this data structure
+        // We know that listener will want to register peers when the
+        loop {
+            // maybe listen to explcit disconnects here as well
+            let (mut socket, _) = listener.accept().await?; // or error?
+
+            // we need to think about what we store here
+            // this should block and establish the connection in seperate threads
+            // The problem is that we only know the peers ID when they say a hello,
+            // If we block here on each connection, it means that a peer could connect, and then go
+            // silent, effectively preventing other peers from connecting to this node.
+            // So what we need to do, is only create a peer when we receive a hello on the socket
+
+            // with a connection, we need to ask the peer for it's ID
+            // THis should be done is a seperate thread
+            let remote_peer = RemotePeer::new(socket);
+            self.peers.add(remote_peer.id.clone(), remote_peer);
+
+
+            tokio::spawn(async move {
+                // Query the connection for a peer ID
+                // Read a reply and then register the connection 
+                let mut buf = [0; 1024];
+
+                // 
+                loop {
+                    // read from socket or write path
+                    let n = socket
+                        .read(&mut buf)
+                        .await
+                        .expect("failed to read data from socket");
+
+                    if n == 0 {
+                        return;
+                    }
+
+                    socket
+                        .write_all(&buf[0..n])
+                        .await
+                        .expect("failed to write data to socket")
+                }
+            });
+        }
+    }
+}
