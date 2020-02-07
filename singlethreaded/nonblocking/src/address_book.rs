@@ -21,6 +21,10 @@ pub enum Event {
     ToPeer(PeerID, PeerMessage),
     FromPeer(PeerID, PeerMessage),
 
+    GetAddressBook(),
+    AddressBook(AddressBook),
+
+
     Terminate(),
     Terminated(),
 
@@ -65,7 +69,7 @@ impl Entry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AddressBook {
     id: PeerID,
-    mapping: HashMap<PeerID, Entry>,
+    pub mapping: HashMap<PeerID, Entry>,
 }
 
 // XXX: use a stupid hash which will cause collisions
@@ -123,6 +127,9 @@ impl AddressBook {
             Event::Terminate() => {
                 return Event::Terminated();
             },
+            Event::GetAddressBook() => {
+                return Event::AddressBook(self.clone());
+            },
             _ => {
                 info!("Missed event: {:?}", event);
                 return Event::NoOp();
@@ -138,6 +145,7 @@ impl AddressBook {
     }
 }
 
+// XXX: Can this be removed?
 type Entries = Vec<(PeerID, Entry)>;
 impl From<Entries> for AddressBook {
     fn from(entries: Entries) -> Self {

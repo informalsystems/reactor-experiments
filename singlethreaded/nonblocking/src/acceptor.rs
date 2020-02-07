@@ -20,8 +20,6 @@ pub struct Acceptor {
     entry: Entry,
 }
 
-// TODO: Emit a READY event such that simulations can be synchronized
-
 // Acceptor establishes connections involving a handshake process
 // Acceptor can receive connection from a socket, on connection
 // It will send Hello on the socket

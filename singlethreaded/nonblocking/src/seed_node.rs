@@ -33,9 +33,10 @@ use log::{info};
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone)]
 enum NodeEvent {
-    Connect(PeerID, Entry),
+    Connect(PeerID, Entry), // TODO: Probably only need Entry here since it contains PeerID
     Connected(PeerID, PeerID), // when one peer connects to another
-    Test(),
+    GetAddressBook(),
+    AddressBook(AddressBook),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -83,25 +84,10 @@ impl SeedNode {
         return SeedNode {entry}
     }
 
-    // Given how we are being diligent about the deployment of tasks as threads, it may be even
-    // simpler to avoid the tokio runtime and use threads with channels.
-
-    // Intead of using a single queue of events, and matching on the event type of. It might be
-    // simpler and better in terms of quality of service, to have seperate queues per component and
-    // then select between queues in the central routing table.
-    //
-    // Additionally, if we were to select on queues instead of on message types, one of the queues
-    // could be a channel which is populated periodically as a timer in order to coorinate
-    // timeouts.
-
-    // Conversino problem
-    // Can we convert a Sender to a different type of sender?
     async fn run(self,
         mut events_out_send: mpsc::Sender<Event>,
         events_in_send: mpsc::Sender<Event>,
         mut events_receive: mpsc::Receiver<Event>) {
-        // The ergonomics here can be improved by changing run to a start
-        // and then returning the channels needed for interaction
         let (mut acceptor_sender, acceptor_receiver) = mpsc::channel::<AcceptorEvent>(1);
         let acceptor = Acceptor::new(self.entry.clone());
         let acceptor_output_sender = events_in_send.clone();
@@ -128,9 +114,17 @@ impl SeedNode {
            info!("[{}] node received: {:?}", self.entry.id, event);
             match event {
                 Event::Node(node_event) => {
-                    if let NodeEvent::Connect(peer_id, entry) = node_event {
-                        let o_event = AcceptorEvent::Connect(entry);
-                        acceptor_sender.send(o_event).await.unwrap();
+                    match node_event {
+                        NodeEvent::Connect(peer_id, entry) => {
+                            let o_event = AcceptorEvent::Connect(entry);
+                            acceptor_sender.send(o_event).await.unwrap();
+                        },
+                        NodeEvent::GetAddressBook() => {
+                            ab_sender.send(AddressBookEvent::GetAddressBook()).await.unwrap();
+                        },
+                        _ => {
+                            // NoOp
+                        }
                     }
                 },
                 Event::Acceptor(acceptor_event) => {
@@ -157,9 +151,11 @@ impl SeedNode {
                             dispatcher_sender.send(DispatcherEvent::ToPeer(peer_id, msg)).await.unwrap();
                         },
                         AddressBookEvent::PeerAdded(added_peer_id) => {
-                            info!("emitting peer connected");
                             let my_id = self.entry.id.clone();
                             events_out_send.send(NodeEvent::Connected(my_id, added_peer_id).into()).await.unwrap();
+                        },
+                        AddressBookEvent::AddressBook(address_book) => {
+                            events_out_send.send(NodeEvent::AddressBook(address_book).into()).await.unwrap();
                         },
                         _ => {
                         }
@@ -176,11 +172,13 @@ mod tests {
     use simple_logger;
 
     fn test_setup() {
-        simple_logger::init_with_level(log::Level::Debug).unwrap();
+       simple_logger::init_with_level(log::Level::Debug).unwrap();
     }
 
+    // Test a sequence of events with triggers driven by expectations to see if we can successfully
+    // perform asynchronous testing.
     #[test]
-    fn test_network() {
+    fn test_monotonic_expectations() {
         test_setup();
         use tokio::runtime::Runtime;
         let mut rt = Runtime::new().unwrap();
@@ -198,8 +196,6 @@ mod tests {
             8903
         ));
 
-        // so what we really need is to clone the main loop sender such that the internal
-        // components can route events to itself
         let (mut node1_in_send, node1_in_recv) = mpsc::channel::<Event>(1);
         let (node1_out_send, node1_out_recv) = mpsc::channel::<Event>(1);
         let node1_in_send2 = node1_in_send.clone();
@@ -223,29 +219,46 @@ mod tests {
                     ip_addr.clone(),
                     8903))))).unwrap();
 
-        let mut connected:i32 = 0;
         let mut stream = futures::stream::select(node1_out_recv, node2_out_recv);
 
-        let mut script = HashMap::new();
-        script.insert(
+        let mut expectations = HashMap::new();
+        expectations.insert(
             Event::Node(NodeEvent::Connected(PeerID::from("1"), PeerID::from("2"))),
-            Event::Node(NodeEvent::Test()));
+            Event::Node(NodeEvent::GetAddressBook()));
+
+        // State for the test
+        let mut connected:i32 = 0;
+        let mut found = false;
 
         while let Some(event) = rt.block_on(stream.next()) {
             info!("Test Stream received; {:?}", event);
-            if let Some(response) = script.get(&event) {
+            if let Some(response) = expectations.remove(&event) {
                 info!("Test triggered sending {:?}", response);
+                rt.block_on(node1_in_send.send(response)).unwrap();
             }
-            if let Event::Node(NodeEvent::Connected(from_peer_id, to_peer_id)) = event {
-                info!("Peer {} connected to {}", from_peer_id, to_peer_id);
-                //timer.touch = now;
-                connected += 1;
-                if connected == 2 {
-                    info!("All peers connected");
-                    return
+            match event {
+                Event::Node(NodeEvent::Connected(from_peer_id, to_peer_id)) => {
+                    info!("Peer {} connected to {}", from_peer_id, to_peer_id);
+                    //timer.touch = now;
+                    connected += 1;
+                    if connected == 2 && found {
+                        return
+                    }
+                },
+                Event::Node(NodeEvent::AddressBook(address_book)) => {
+                    info!("Got an address book");
+                    if let Some(entry) = address_book.mapping.get(&PeerID::from("2")) {
+                        info!("address book contains {:?}", entry);
+                        found = true;
+                        if connected == 2 && found {
+                            return
+                        }
+                    }
+                },
+                _ => {
+                    // oops
                 }
             }
-
         }
     }
 }
